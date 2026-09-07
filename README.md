@@ -94,7 +94,56 @@ wavefolder and a state-variable filter (LP→BP morph) in switchable routing
 - **Six knob pages** with jog‑wheel navigation: **Voice · WaveFolder · Filter · Tone · Mod Routing · Randomise**.
 - **Keyboard tracking depth** per oscillator (Mod Routing page), a Move‑native stand‑in for the hardware's 1V/oct inputs.
 - **Randomise page** — arm any of Voice / WaveFolder / Filter / Tone with per‑page toggles, then hit **Generate** to randomise all armed pages at once.
-- **Preset save/recall** of the full patch, including the Randomise toggles.per-channel warm mixer overdrive, a
+- **Preset save/recall** of the full patch, including the Randomise toggles.
+
+## Signal Flow
+
+```
+ MIDI note / velocity
+        │
+        ├─► EG1 (decay)  ──┐ modulation → VCO pitch · MOD pitch · FM depth
+        │                  │              · Fold amount · Filter cutoff
+        └─► EG2 (decay)  ──┼─┐
+                           │ └──────────────► VCA (amplitude)
+                           │
+   ┌───────────────────────┴───────────────────────────────────┐
+   │                     OSCILLATORS                            │
+   │   VCO (sine) ◄──TZFM── MOD VCO (triangle)                  │
+   │       │                    │                               │
+   │       ├────── RING (VCO × MOD) ──────┐                     │
+   │       │                    │         │      NOISE (var tone)
+   └───────┼────────────────────┼─────────┼────────────┼────────┘
+           ▼                    ▼         │            ▼
+      warm sat              warm sat      │        warm sat        ← per-channel
+      (VCO lvl)             (MOD lvl)     │        (Noise lvl)       overdrive
+           └─────────┬──────────┘         │            │
+                     ▼                    │            ▼
+                  Σ mix  ◄────────── ring (clean) ─────┘
+                     │
+                     │
+     ┌───────────────┴────────────────────────────────────┐
+     │            ORDER  (VCW>VCF · Parallel · VCF>VCW)     │
+     │                                                     │
+     │     ┌── VCW: Wavefolder (+ Bias) ──┐                │
+     │     │                              │                │
+     │     └── VCF: State-Variable Filter ┘   (LP ◄─► BP)  │
+     │              cutoff · reso · mode                   │
+     │                                                     │
+     │            BLEND  (fold ◄─────► filter)             │
+     └───────────────────────┬─────────────────────────────┘
+                             ▼
+                             │
+                     VCA  × EG2 × velocity
+                             │
+                   Tone/Sat  (Boss-style OD)      ← on the VCA output
+                     drive → asym clip → tone
+                             │
+                        Out Level
+                             │
+                    + analog noise floor
+                             ▼
+                          L / R  out
+```
 ---
 
 ## Install
