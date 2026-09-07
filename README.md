@@ -30,7 +30,7 @@ recreation of the Labyrinth's dual generative sequencer section.
 - **Clock-synced** to the Move transport (24 PPQN, start/stop/continue).
 - **Pattern + position persistence** (Maze tool) — survives exit.
 
-## Maze Seq (tool) hardware layout
+### Maze Seq (tool) hardware layout
 - **16 step buttons** = the two sequencers.
   1–8 = Seq1 (red bit / yellow play head),
   9–16 = Seq2 (blue bit / yellow play head).
@@ -58,9 +58,8 @@ recreation of the Labyrinth's dual generative sequencer section.
   
 - **Back** = hide (keeps playing in the background); **Shift+Back** = exit.
 
---
 
-## Maze Seq Lite (slot MIDI FX)
+### Maze Seq Lite (slot MIDI FX)
 Insert in a MIDI-FX slot, route to a synth, press Play. Pages in order:
 - **Sequencer 1:** Corrupt, Range, Length, Bit Flip, Advance, Reset, Trig Mix.
 - **Sequencer 2:** Corrupt, Range, Length, Bit Flip, Advance, Reset, Trig Mix
