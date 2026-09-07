@@ -61,8 +61,8 @@ Insert in a MIDI-FX slot, route to a synth, press Play. Pages in order:
   (same Trig Mix as page 1, kept in sync).
 - **Global:** Scale, Note Rate, Note Length, Reset Both.
 
-Bit Flip and Advance are momentary buttons (fire once per press/turn). 
-Incoming notes set the root (transpose).
+- Bit Flip and Advance are momentary buttons (fire once per press/turn). 
+- Incoming notes set the root (transpose).
 
 ---
 
