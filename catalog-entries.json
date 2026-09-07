@@ -1,5 +1,5 @@
 {
-  "_comment": "Add these two objects to the 'modules' array in Schwung's module-catalog.json (open a PR against charlesvestal/schwung). Replace YOUR_GITHUB_USER.",
+  "_comment": "Add these objects to the 'modules' array in Schwung's module-catalog.json (open a PR against charlesvestal/schwung).",
   "entries": [
     {
       "id": "maze_seq",
@@ -21,6 +21,17 @@
       "github_repo": "sd88me/schwung-maze-seq",
       "default_branch": "main",
       "asset_name": "maze_seq_lite-module.tar.gz",
+      "min_host_version": "0.3.0"
+    },
+    {
+      "id": "maze-voice",
+      "name": "Maze Voice",
+      "description": "Monophonic Moog Labyrinth-style thru-zero oscillator / wavefolder / state-variable filter voice. Chainable sound generator.",
+      "author": "Sam Di Domizio",
+      "component_type": "sound_generator",
+      "github_repo": "sd88me/schwung-maze-seq",
+      "default_branch": "main",
+      "asset_name": "maze-voice-module.tar.gz",
       "min_host_version": "0.3.0"
     }
   ]

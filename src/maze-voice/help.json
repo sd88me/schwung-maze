@@ -1,0 +1,50 @@
+{
+  "title": "Maze Voice",
+  "children": [
+    { "title": "Voice", "lines": [
+      "VCO Tune: +/-24 semis",
+      "Mod Freq: Tri osc pitch",
+      "FM Depth: Mod>VCO TZFM",
+      "FM EG1: Env>FM amount",
+      "VCO EG1: Env>VCO pitch",
+      "Mod EG1: Env>Mod pitch",
+      "VCA Decay: amp decay"
+    ] },
+    { "title": "WaveFolder", "lines": [
+      "Fold Drive: wavefold amt",
+      "Fold Bias: asym folding",
+      "Route: VCW/VCF order",
+      "Fold EG1 / Fold Key",
+      "Blend: fold<>filter"
+    ] },
+    { "title": "Filter", "lines": [
+      "Cutoff: exp, dense low end",
+      "Resonance: filter Q",
+      "Filt Mode: LP>BP",
+      "Env1 Dec: mod env (exp)",
+      "Cut EG1 / Cut Key",
+      "Route / Blend"
+    ] },
+    { "title": "Tone", "lines": [
+      "VCO/Mod/Noise Lvl 0-200",
+      " 100=unity, OD above",
+      "Noise Tone: dark<>bright",
+      "Ring Lvl: clean ring mod",
+      "Tone/Sat: Boss OD (VCA)",
+      "Out Level: final gain"
+    ] },
+    { "title": "Mod Routing", "lines": [
+      "VCO Key / Mod Key:",
+      " note tracking depth"
+    ] },
+    { "title": "Randomise", "lines": [
+      "Toggle which pages to",
+      " randomise: Voice, Fold,",
+      " Filter, Tone (on/off).",
+      "Generate: press to",
+      " randomise all toggled-on",
+      " pages at once.",
+      "Toggles save with preset."
+    ] }
+  ]
+}

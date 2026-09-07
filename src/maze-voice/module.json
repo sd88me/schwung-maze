@@ -1,0 +1,103 @@
+{
+  "id": "maze-voice",
+  "name": "Maze Voice",
+  "abbrev": "MAZE",
+  "version": "0.3.6",
+  "description": "Monophonic Moog Labyrinth-style thru-zero oscillator / wavefolder / state-variable filter voice.",
+  "author": "sd88me",
+  "dsp": "dsp.so",
+  "api_version": 2,
+  "raw_midi": true,
+
+  "capabilities": {
+    "audio_in": false,
+    "audio_out": true,
+    "midi_in": true,
+    "midi_out": false,
+    "chainable": true,
+    "component_type": "sound_generator",
+
+    "chain_params": [
+      { "key": "vco_tune",   "name": "VCO Tune",  "type": "float", "min": -24,  "max": 24,   "default": 0,   "step": 1,    "unit": "st" },
+      { "key": "mod_freq",   "name": "Mod Freq",  "type": "float", "min": 0.2,  "max": 1300, "default": 55,  "step": 0.5,  "unit": "Hz", "curve": "log", "display_format": "%.1f" },
+      { "key": "fm_depth",   "name": "FM Depth",  "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "fm_eg1",     "name": "FM EG1",    "type": "float", "min": -100, "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "vco_eg1",    "name": "VCO EG1",   "type": "float", "min": -100, "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "mod_eg1",    "name": "Mod EG1",   "type": "float", "min": -100, "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "env2_decay", "name": "VCA Decay", "type": "float", "min": 0,    "max": 100,  "default": 70,  "step": 1,    "display_format": "%.0f" },
+
+      { "key": "fold_drive", "name": "Fold Drive","type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "fold_bias",  "name": "Fold Bias", "type": "float", "min": -100, "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "route",      "name": "Route",     "type": "enum",  "options": ["VCW>VCF", "Parallel", "VCF>VCW"], "default": 1 },
+      { "key": "fold_eg1",   "name": "Fold EG1",  "type": "float", "min": -100, "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "fold_key",   "name": "Fold Key",  "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "blend",      "name": "Blend",     "type": "float", "min": -100, "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+
+      { "key": "cutoff",     "name": "Cutoff",    "type": "float", "min": 0,    "max": 100,  "default": 100, "step": 1,    "display_format": "%.0f" },
+      { "key": "reso",       "name": "Resonance", "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "filter_mode","name": "Filt Mode", "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "env1_decay", "name": "Env1 Dec",  "type": "float", "min": 0,    "max": 100,  "default": 60,  "step": 1,    "display_format": "%.0f" },
+      { "key": "cutoff_eg1", "name": "Cut EG1",   "type": "float", "min": -100, "max": 100,  "default": 30,  "step": 1,    "display_format": "%.0f" },
+      { "key": "cutoff_key", "name": "Cut Key",   "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+
+      { "key": "vco_lvl",    "name": "VCO Lvl",   "type": "float", "min": 0,    "max": 200,  "default": 100, "step": 1,    "display_format": "%.0f" },
+      { "key": "mod_lvl",    "name": "Mod Lvl",   "type": "float", "min": 0,    "max": 200,  "default": 50,  "step": 1,    "display_format": "%.0f" },
+      { "key": "noise_lvl",  "name": "Noise Lvl", "type": "float", "min": 0,    "max": 200,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "noise_tone", "name": "Noise Tone","type": "float", "min": -100, "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "ring_lvl",   "name": "Ring Lvl",  "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "sat",        "name": "Tone/Sat",  "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "level",      "name": "Out Level", "type": "float", "min": 0,    "max": 100,  "default": 80,  "step": 1,    "display_format": "%.0f" },
+
+      { "key": "vco_key",    "name": "VCO Key",   "type": "float", "min": 0,    "max": 100,  "default": 100, "step": 1,    "display_format": "%.0f" },
+      { "key": "mod_key",    "name": "Mod Key",   "type": "float", "min": 0,    "max": 100,  "default": 100, "step": 1,    "display_format": "%.0f" },
+
+      { "key": "rnd_voice",      "name": "Rnd Voice", "type": "enum", "options": ["off", "on"], "default": 1, "access": "readwrite" },
+      { "key": "rnd_wavefolder", "name": "Rnd Fold",  "type": "enum", "options": ["off", "on"], "default": 1, "access": "readwrite" },
+      { "key": "rnd_filter",     "name": "Rnd Filt",  "type": "enum", "options": ["off", "on"], "default": 1, "access": "readwrite" },
+      { "key": "rnd_tone",       "name": "Rnd Tone",  "type": "enum", "options": ["off", "on"], "default": 1, "access": "readwrite" },
+      { "key": "rnd_go",         "name": "Generate",  "type": "enum", "options": ["off", "go"], "default": 0, "access": "write" }
+    ],
+
+    "ui_hierarchy": {
+      "levels": {
+        "root": {
+          "label": "Voice",
+          "knobs": ["vco_tune", "mod_freq", "fm_depth", "fm_eg1", "vco_eg1", "mod_eg1", "env2_decay"],
+          "params": [
+            "vco_tune", "mod_freq", "fm_depth", "fm_eg1", "vco_eg1", "mod_eg1", "env2_decay",
+            { "level": "wavefolder", "label": "WaveFolder" },
+            { "level": "filter",     "label": "Filter" },
+            { "level": "tone",       "label": "Tone" },
+            { "level": "modrouting", "label": "Mod Routing" },
+            { "level": "randomise",  "label": "Randomise" }
+          ]
+        },
+        "wavefolder": {
+          "label": "WaveFolder",
+          "knobs": ["fold_drive", "fold_bias", "route", "fold_eg1", "fold_key", "blend"],
+          "params": ["fold_drive", "fold_bias", "route", "fold_eg1", "fold_key", "blend"]
+        },
+        "filter": {
+          "label": "Filter",
+          "knobs": ["cutoff", "reso", "filter_mode", "env1_decay", "cutoff_eg1", "cutoff_key", "route", "blend"],
+          "params": ["cutoff", "reso", "filter_mode", "env1_decay", "cutoff_eg1", "cutoff_key"]
+        },
+        "tone": {
+          "label": "Tone",
+          "knobs": ["vco_lvl", "mod_lvl", "noise_lvl", "noise_tone", "ring_lvl", "sat", "level"],
+          "params": ["vco_lvl", "mod_lvl", "noise_lvl", "noise_tone", "ring_lvl", "sat", "level"]
+        },
+        "modrouting": {
+          "label": "Mod Routing",
+          "knobs": ["vco_key", "mod_key"],
+          "params": ["vco_key", "mod_key"]
+        },
+        "randomise": {
+          "label": "Randomise",
+          "knobs": ["rnd_voice", "rnd_wavefolder", "rnd_filter", "rnd_tone", "rnd_go"],
+          "params": ["rnd_voice", "rnd_wavefolder", "rnd_filter", "rnd_tone", "rnd_go"]
+        }
+      }
+    }
+  }
+}

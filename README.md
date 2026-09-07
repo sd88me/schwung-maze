@@ -1,17 +1,19 @@
-# Maze — dual generative sequencer for Ableton Move (Schwung)
+# Maze — Moog-Labyrinth-style modules for Ableton Move (Schwung)
 
-Two Moog-Labyrinth-inspired generative sequencers for the
+Moog-Labyrinth-inspired modules for the
 [Schwung](https://github.com/charlesvestal/schwung) framework on Ableton Move.
-This repository ships **two** modules:
+This repository ships **three** modules:
 
 | Module | ID | Type | What it is |
 |---|---|---|---|
 | **Maze** | `maze_seq` | overtake tool | Full pad + step-button instrument with its own display |
 | **Maze Lite** | `maze_seq_lite` | slot MIDI FX | The same engine as a chain MIDI-FX slot (auto knob menu) |
+| **Maze Voice** | `maze-voice` | sound generator | Monophonic thru-zero oscillator / wavefolder / SVF voice — the Labyrinth's synth section as a chain slot |
 
-Both run two 8-step generative sequencers that clock-sync to the Move transport,
-quantise random voltages to a scale, and play MIDI out — a recreation of the
-Labyrinth's dual generative sequencer section.
+`maze_seq` / `maze_seq_lite` run two 8-step generative sequencers that clock-sync
+to the Move transport, quantise random voltages to a scale, and play MIDI out — a
+recreation of the Labyrinth's dual generative sequencer section. `maze-voice` is
+the matching monosynth: pair it in a Signal Chain slot behind Maze Lite.
 
 ---
 
@@ -58,13 +60,22 @@ Insert in a MIDI-FX slot, route to a synth, press Play. Pages in order:
 Bit Flip and Advance are momentary buttons (fire once per press/turn). Incoming
 notes set the root (transpose).
 
+### Maze Voice (chainable sound generator)
+A monophonic thru-zero-FM voice: sine VCO + triangle modulator with TZFM, a
+wavefolder and a state-variable filter (LP→BP morph) in switchable routing
+(`VCW>VCF` / parallel / `VCF>VCW`), per-channel warm mixer overdrive, a
+Boss-style output drive, and two decay envelopes. Knob-grid pages: **Voice,
+WaveFolder, Filter, Tone, Mod Routing, Randomise**. The Randomise page has four
+latching toggles (Voice / WaveFolder / Filter / Tone) that arm which pages the
+momentary **Generate** button randomises; the toggles save with the preset.
+
 ---
 
 ## Install
 
 ### Option A — manual (for testers, no store needed)
-1. Download the latest `maze_seq-module.tar.gz` and/or `maze_seq_lite-module.tar.gz` from [Releases](../../releases).
-2. Extract onto the Move:
+1. Download the latest tarballs from [Releases](../../releases).
+2. Extract onto the Move (each module goes in its own category dir):
    ```bash
    # tool
    scp maze_seq-module.tar.gz ableton@<MOVE_IP>:/tmp/
@@ -72,8 +83,12 @@ notes set the root (transpose).
    # lite (slot MIDI FX)
    scp maze_seq_lite-module.tar.gz ableton@<MOVE_IP>:/tmp/
    ssh ableton@<MOVE_IP> 'cd /data/UserData/schwung/modules/midi_fx && tar xzf /tmp/maze_seq_lite-module.tar.gz'
+   # voice (chainable sound generator)
+   scp maze-voice-module.tar.gz ableton@<MOVE_IP>:/tmp/
+   ssh ableton@<MOVE_IP> 'cd /data/UserData/schwung/modules/sound_generators && tar xzf /tmp/maze-voice-module.tar.gz'
    ```
-3. Power-cycle the Move. **Maze** appears in Shadow → Tools; **Maze Lite** in a MIDI-FX slot.
+3. Power-cycle the Move. **Maze** appears in Shadow → Tools; **Maze Lite** in a
+   MIDI-FX slot; **Maze Voice** in a sound-generator slot.
 
 ### Option B — Schwung Manager / Module Store
 Once listed in the Schwung catalog, install from the Schwung Manager web UI at
@@ -90,6 +105,7 @@ bash scripts/build.sh
 # produces:
 #   dist/maze_seq-module.tar.gz
 #   dist/maze_seq_lite-module.tar.gz
+#   dist/maze-voice-module.tar.gz
 ```
 
 ### Vendored headers
@@ -114,6 +130,9 @@ src/
   maze_seq_lite/            # slot MIDI FX
     module.json  help.json
     dsp/maze_seq_lite.c
+  maze-voice/               # chainable sound generator
+    module.json  help.json
+    dsp/maze_voice.c
   include/                  # vendored Schwung headers (not committed)
 scripts/
   build.sh  Dockerfile
@@ -126,12 +145,12 @@ release.json  catalog-entries.json
 ## Publishing (tagged releases)
 
 ```bash
-# bump versions in the two src/*/module.json files, commit, then:
+# bump versions in the src/*/module.json files, commit, then:
 git tag v1.0.0
 git push --tags
 ```
 
-GitHub Actions cross-compiles both modules, attaches the two tarballs to the
+GitHub Actions cross-compiles all modules, attaches the tarballs to the
 release, and updates `release.json` on `main`. To be listed in the Schwung
 Module Store, open a PR adding the entries in `catalog-entries.json` to
 [`module-catalog.json`](https://github.com/charlesvestal/schwung/blob/main/module-catalog.json).
