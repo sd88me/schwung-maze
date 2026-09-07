@@ -16,8 +16,10 @@ recreation of the Labyrinth's dual generative sequencer section.
 
 `maze-voice` is the matching monosynth: pair it in a Signal Chain slot behind Maze Lite, or via Maze Overtake.
 
-### Features
+---
+## Maze Sequencer
 
+### Features
 - **Dual 8-step generative sequencers** with per-step random CV, quantised to a scale.
 - **Corrupt (0–100)** — mutates stored voltages; past 12 o'clock also flips bits (evolving patterns).
 - **Range (0–100)** — bipolar pitch spread around the root.
@@ -27,10 +29,8 @@ recreation of the Labyrinth's dual generative sequencer section.
 - **12 scales**, selectable key, note-rate (1/32…1 bar), gate length (1/4…2 steps).
 - **Clock-synced** to the Move transport (24 PPQN, start/stop/continue).
 - **Pattern + position persistence** (Maze tool) — survives exit.
-  
----
 
-## Maze (tool) hardware layout
+## Maze Seq (tool) hardware layout
 - **16 step buttons** = the two sequencers.
   1–8 = Seq1 (red bit / yellow play head),
   9–16 = Seq2 (blue bit / yellow play head).
@@ -60,7 +60,7 @@ recreation of the Labyrinth's dual generative sequencer section.
 
 --
 
-## Maze Lite (slot MIDI FX)
+## Maze Seq Lite (slot MIDI FX)
 Insert in a MIDI-FX slot, route to a synth, press Play. Pages in order:
 - **Sequencer 1:** Corrupt, Range, Length, Bit Flip, Advance, Reset, Trig Mix.
 - **Sequencer 2:** Corrupt, Range, Length, Bit Flip, Advance, Reset, Trig Mix
