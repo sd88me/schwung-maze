@@ -35,27 +35,22 @@ recreation of the Labyrinth's dual generative sequencer section.
   1–8 = Seq1 (red bit / yellow play head),
   9–16 = Seq2 (blue bit / yellow play head).
   Press to flip a bit. The play head stays lit when the transport is stopped.
-  
 - **Top 3 pad rows** = a fixed scale keyboard (each row = one octave, ascending
   scale degrees left→right; the middle-row first pad is the root). Press a pad to
   transpose the whole sequence to that interval. Octave roots light white, the
   active pad lights green.
-  
 - **+ / −** = shift the pad keyboard up/down an octave to reach higher/lower
   registers. The sounding note doesn't change — the layout moves, and the
   highlighted pad follows the same note to its new row.
 - **Bottom pad row** = per-sequencer advance ◄/► (orange) and length−minus1 (red).
 - **Jog wheel** = switch between the two knob pages.
-- 
 - **Knobs — Sequencers page:**
   1 - Corrupt, 2 - Range, 3 - Length (Seq1, red LEDs);
   4 - Trig Mix (red/white/blue LED);
   5 - Corrupt, 6 - Range, 7 - Length (Seq2, blue LEDs);
   8 - Reset Both, in bars (orange when armed, off when Off).
-  
 - **Knobs — Global page:** 1 Scale, 2 Key, 3 Note Rate, 4 Note Length (white LEDs);
   5 - Seq1 MIDI Channel, 6 - MIDI Seq2 Channel (green LEDs).
-  
 - **Back** = hide (keeps playing in the background); **Shift+Back** = exit.
 
 
