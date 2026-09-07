@@ -3,9 +3,9 @@
  *  "Maze Voice" — Moog Labyrinth-style thru-zero oscillator / wavefolder /
  *  state-variable filter voice for Ableton Move.
  *
- *  Released from the schwung-maze-sequencer repo; the repo versions every
- *  module by git tag, so module.json tracks the repo (1.2.0) rather than the
- *  0.3.x dev line the change notes below refer to. No DSP change since v0.3.6.
+ *  Released from the schwung-maze repo; the repo versions every module by git
+ *  tag, so module.json tracks the repo (1.2.0) rather than the 0.3.x dev line
+ *  the change notes below refer to. No DSP change since v0.3.6.
  *
  *  v0.3.6 change — Randomise page, module.json only, no DSP change:
  *    rnd_voice / rnd_wavefolder / rnd_filter / rnd_tone now declare
