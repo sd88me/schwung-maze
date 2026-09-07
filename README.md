@@ -16,7 +16,7 @@ recreation of the Labyrinth's dual generative sequencer section.
 
 `maze-voice` is the matching monosynth: pair it in a Signal Chain slot behind Maze Lite, or via Maze Overtake.
 
-## Features
+### Features
 
 - **Dual 8-step generative sequencers** with per-step random CV, quantised to a scale.
 - **Corrupt (0–100)** — mutates stored voltages; past 12 o'clock also flips bits (evolving patterns).
