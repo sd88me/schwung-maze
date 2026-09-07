@@ -72,6 +72,19 @@ static const int RATE_PULSES[]={3,6,12,24,48,96};
 static const float GATE_STEPS[]={0.25f,0.5f,0.75f,1.0f,1.25f,1.5f,1.75f,2.0f};
 #define NUM_GATES ((int)(sizeof(GATE_STEPS)/sizeof(GATE_STEPS[0])))
 
+/* Sequence Reset (Reset Both knob): snap both play heads to step 1 every N BARS.
+   UI sends index 0..4 -> 1,2,4,8 bars, 0 = off. One bar = 96 clock pulses;
+   every note rate divides it evenly, so N bars = N*(96/RATE_PULSES) steps.
+   Keep in sync with RESET_LABELS in ui.js. */
+#define PULSES_PER_BAR 96
+static const int RESET_BARS[]={1,2,4,8,0};
+#define NUM_RESETS ((int)(sizeof(RESET_BARS)/sizeof(RESET_BARS[0])))
+static inline int reset_bars_from_idx(int idx){
+    if (idx<0) idx=0;
+    if (idx>=NUM_RESETS) idx=NUM_RESETS-1;
+    return RESET_BARS[idx];
+}
+
 #define MAX_SPREAD 64   /* ==>> EDIT ME: semitone spread each side of root */
 
 typedef struct {
@@ -79,6 +92,7 @@ typedef struct {
     float cv [NUM_STEPS];
     int   length, play, corrupt, cv_range;   /* corrupt/cv_range: 0..100 */
     int   channel;
+    int   reset_bars, reset_ctr;             /* reset_bars: bars per reset, 0 = off; reset_ctr counts steps */
     int   last_note, last_ch; long off_pulse; int note_active;
 } seq_t;
 
@@ -156,7 +170,14 @@ static void all_notes_off(maze_t *L){ seq_note_off(L,&L->s[0]); seq_note_off(L,&
 static void step_seq(maze_t *L, int which, int vel){
     seq_t *q=&L->s[which];
     int n=q->length<1?1:q->length;
+    /* Sequence Reset: every reset_bars bars, snap the play head back to step 1.
+       steps/bar = 96/RATE_PULSES at the current note rate. */
+    if (q->reset_bars>0){
+        int thresh = q->reset_bars * (PULSES_PER_BAR / RATE_PULSES[L->rate]);
+        if (thresh>0 && q->reset_ctr>=thresh){ q->play=-1; q->reset_ctr=0; }
+    }
     q->play=(q->play+1)%n;
+    q->reset_ctr++;
     seq_corrupt(q,q->play);
     if (q->bit[q->play] && vel>0){
         seq_note_off(L,q);
@@ -170,7 +191,11 @@ static void step_seq(maze_t *L, int which, int vel){
 static void flush_offs(maze_t *L){
     for (int i=0;i<2;i++){ seq_t *q=&L->s[i]; if(q->note_active && L->pulse>=q->off_pulse) seq_note_off(L,q); }
 }
-static void transport_reset(maze_t *L){ L->pulse=0; L->s[0].play=-1; L->s[1].play=-1; }
+static void transport_reset(maze_t *L){
+    L->pulse=0;
+    L->s[0].play=-1; L->s[1].play=-1;
+    L->s[0].reset_ctr=0; L->s[1].reset_ctr=0;
+}
 static void set_root_from_key(maze_t *L){
     int r=60+(L->key%12)+L->transpose+L->pad_semis;
     if(r<0)r=0; if(r>127)r=127; L->root=r;
@@ -283,6 +308,7 @@ static void *maze_create(const char *module_dir, const char *json_defaults){
     seq_randomize(&L->s[0]); seq_randomize(&L->s[1]);
     L->s[0].cv_range=20; L->s[0].channel=0;   /* ==>> EDIT ME: default Seq1 ch */
     L->s[1].cv_range=20; L->s[1].channel=0;   /* ==>> EDIT ME: default Seq2 ch */
+    L->s[0].reset_bars=0; L->s[1].reset_bars=0; /* default: off (never reset) */
 
     pthread_mutex_init(&L->state_mutex, NULL);
     maze_load_state(L);                        /* one-time load (like tb3po) */
@@ -347,6 +373,8 @@ static void maze_set_param(void *inst, const char *key, const char *val){
     else if (!strcmp(key,"s2_adv")){ int n=L->s[1].length<1?1:L->s[1].length; L->s[1].play=((L->s[1].play+(v<0?-1:1))%n+n)%n; }
     else if (!strcmp(key,"s2_len_dec")){ L->s[1].length=(L->s[1].length<=1)?8:L->s[1].length-1; }
     else if (!strcmp(key,"trig_mix"))    L->trig_mix=(v<-63?-63:(v>64?64:v));
+    /* Reset Both: one global reset length (in bars) for both sequencers. */
+    else if (!strcmp(key,"g_reset")){ int rb=reset_bars_from_idx(v); L->s[0].reset_bars=rb; L->s[1].reset_bars=rb; }
     else if (!strcmp(key,"scale"))       L->scale=(v<0?0:(v>=NUM_SCALES?NUM_SCALES-1:v));
     else if (!strcmp(key,"key")){ L->key=((v%12)+12)%12; set_root_from_key(L); }
     else if (!strcmp(key,"note_rate"))   L->rate=(v<0?0:(v>=NUM_RATES?NUM_RATES-1:v));

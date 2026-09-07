@@ -40,6 +40,9 @@
         "current step.",
         "Advance: nudge the",
         "play head.",
+        "Reset: jump to step 1",
+        "every 1/2/4/8 bars",
+        "(Off to disable).",
         "Trig Mix (Seq1 page):",
         "velocity Seq1<->Seq2."
       ]
@@ -61,7 +64,11 @@
         "Note Rate: 1/32 up to",
         "1 bar.",
         "Note Length: gate,",
-        "1/4 step to 2 steps."
+        "1/4 step to 2 steps.",
+        "Reset Both: reset",
+        "both seqs to step 1",
+        "together, every",
+        "1/2/4/8 bars."
       ]
     }
   ]

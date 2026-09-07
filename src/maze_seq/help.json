@@ -51,7 +51,11 @@
             "K4 Trig Mix",
             "K5 Seq2 Corrupt",
             "K6 Seq2 Range",
-            "K7 Seq2 Length"
+            "K7 Seq2 Length",
+            "K8 Reset Both:",
+            " both seqs to step 1",
+            " every 1/2/4/8 bars",
+            " (Off to disable)"
           ]
         },
         {

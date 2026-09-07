@@ -61,13 +61,16 @@ const SCALES = [
 const RATE_NAMES = ["1/32","1/16","1/8","1/4","1/2","1 bar"];
 const GATE_NAMES = ["1/4","1/2","3/4","1","1 1/4","1 1/2","1 3/4","2"];
 const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+/* Reset Both: BARS between play-head resets. Last index = Off.
+   MUST match RESET_BARS[] in maze_seq.c. */
+const RESET_LABELS = ["1b","2b","4b","8b","Off"];
 
 /* UI owns everything except bit/play/running (those are polled from the DSP). */
 const U = {
   page:0,
   s1_corrupt:0, s1_cv_range:20, s1_length:8, s1_channel:0,
   s2_corrupt:0, s2_cv_range:20, s2_length:8, s2_channel:0,
-  trig_mix:0, scale:1, key:0, rate:1, gate:3,
+  trig_mix:0, scale:1, key:0, rate:1, gate:3, g_reset:4,   /* g_reset: index into RESET_LABELS; last = Off */
   pad_semis:0, padOct:0, padRow:2, padCol:0,   /* padOct = keyboard octave shift */
   s1_bits:[0,0,0,0,0,0,0,0], s1_play:-1,
   s2_bits:[0,0,0,0,0,0,0,0], s2_play:-1
@@ -98,6 +101,7 @@ function assertOwnedParams(){
   setP("scale",U.scale); setP("key",U.key);
   setP("note_rate",U.rate); setP("note_length",U.gate);
   setP("trig_mix",U.trig_mix);
+  setP("g_reset",U.g_reset);
   setP("transpose","0");                 /* octave now lives in pad_semis */
   setP("pad_semis",U.pad_semis);
   setP("s1_corrupt",U.s1_corrupt);  setP("s1_cv_range",U.s1_cv_range);  setP("s1_length",U.s1_length);  setP("s1_channel",U.s1_channel);
@@ -128,7 +132,7 @@ function handleKnob(idx, delta){
       case 4: adjCont("s2_corrupt","s2_corrupt",delta,0,100); break;
       case 5: adjCont("s2_cv_range","s2_cv_range",delta,0,100); break;
       case 6: adjStep("s2_length","s2_length",delta,1,8); break;
-      /* case 7: free */
+      case 7: adjStep("g_reset","g_reset",delta,0,RESET_LABELS.length-1); break;   /* Reset Both */
     }
   } else {                                 /* PAGE 2: GLOBAL */
     switch(idx){
@@ -254,6 +258,7 @@ function knobFrac(idx){
       case 4: return U.s2_corrupt/100;
       case 5: return U.s2_cv_range/100;
       case 6: return (U.s2_length-1)/7;
+      case 7: return U.g_reset/(RESET_LABELS.length-1);
       default: return -1;
     }
   } else {
@@ -319,6 +324,7 @@ function desiredLEDs(){
     const cc=CC_KNOB_BASE+k;
     let col;
     if(U.page===0 && k===3){ col=trigMixLed(); }        /* Trig Mix stays 3-colour */
+    else if(U.page===0 && k===7){ col=(U.g_reset<RESET_LABELS.length-1)?LED_ORANGE:LED_OFF; }  /* Reset Both: lit when armed */
     else col = (KNOB_COLS[k]===null? LED_OFF : KNOB_COLS[k]);
     list.push(["b", cc, col]);
   }
@@ -376,7 +382,7 @@ function draw(){
     drawKnobCell(4,"2Cor", ""+U.s2_corrupt,            U.s2_corrupt/100);
     drawKnobCell(5,"2Rng", ""+U.s2_cv_range,           U.s2_cv_range/100);
     drawKnobCell(6,"2Len", ""+U.s2_length,             (U.s2_length-1)/7);
-    drawKnobCell(7,"", "", null);
+    drawKnobCell(7,"Rst", RESET_LABELS[U.g_reset],     U.g_reset/(RESET_LABELS.length-1));
   } else {
     print(0,0,"GLOBAL       Xpose "+xposeStr(),1);
     drawKnobCell(0,"Scale", SCALES[U.scale].name.substr(0,5), U.scale/(SCALES.length-1));

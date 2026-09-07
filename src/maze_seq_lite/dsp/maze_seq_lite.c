@@ -62,12 +62,30 @@ static const int RATE_PULSES[]={3,6,12,24,48,96};
 static const float GATE_STEPS[]={0.25f,0.5f,0.75f,1.0f,1.25f,1.5f,1.75f,2.0f};
 #define NUM_GATES ((int)(sizeof(GATE_STEPS)/sizeof(GATE_STEPS[0])))
 
+/* Sequence Reset: force the play head back to step 1 every N BARS.
+   index 0..4 -> 1,2,4,8 bars, 0 = off (never reset). One bar = 96 clock pulses;
+   every note rate divides it evenly, so N bars = N*(96/RATE_PULSES) steps.
+   Keep in sync with the "s1_reset"/"s2_reset"/"g_reset" enum options in module.json. */
+#define PULSES_PER_BAR 96
+static const int RESET_BARS[]={1,2,4,8,0};
+#define NUM_RESETS ((int)(sizeof(RESET_BARS)/sizeof(RESET_BARS[0])))
+static inline int reset_bars_from_idx(int idx){
+    if (idx<0) idx=0;
+    if (idx>=NUM_RESETS) idx=NUM_RESETS-1;
+    return RESET_BARS[idx];
+}
+static inline int reset_idx_from_bars(int bars){
+    for (int i=0;i<NUM_RESETS;i++) if (RESET_BARS[i]==bars) return i;
+    return NUM_RESETS-1;   /* unknown -> off */
+}
+
 #define MAX_SPREAD 64   /* ==>> EDIT ME: semitone spread each side of root */
 
 typedef struct {
     int   bit[NUM_STEPS];
     float cv [NUM_STEPS];
     int   length, play, corrupt, cv_range;   /* corrupt/cv_range: 0..100 */
+    int   reset_bars, reset_ctr;             /* reset_bars: bars per reset, 0 = off; reset_ctr counts steps */
 } seq_t;
 typedef struct { int note, ch; long off_pulse; int active; } voice_t;
 typedef struct {
@@ -146,7 +164,14 @@ static int all_notes_off(maze_t *L,uint8_t o[][3],int ln[],int max,int w){
 static int step_seq(maze_t *L,int which,int vel,uint8_t o[][3],int ln[],int max,int w){
     seq_t *q=&L->s[which];
     int n=q->length<1?1:q->length;
+    /* Sequence Reset: every reset_bars bars, snap the play head back to step 1.
+       steps/bar = 96/RATE_PULSES at the current note rate. */
+    if (q->reset_bars>0){
+        int thresh = q->reset_bars * (PULSES_PER_BAR / RATE_PULSES[L->rate]);
+        if (thresh>0 && q->reset_ctr>=thresh){ q->play=-1; q->reset_ctr=0; }
+    }
     q->play=(q->play+1)%n;
+    q->reset_ctr++;
     seq_corrupt(q,q->play);
     if (q->bit[q->play] && vel>0 && w<max){
         int note=quantize_note(L,q->cv[q->play],q->cv_range);
@@ -158,7 +183,11 @@ static int step_seq(maze_t *L,int which,int vel,uint8_t o[][3],int ln[],int max,
     }
     return w;
 }
-static void transport_reset(maze_t *L){ L->pulse=0; L->s[0].play=-1; L->s[1].play=-1; }
+static void transport_reset(maze_t *L){
+    L->pulse=0;
+    L->s[0].play=-1; L->s[1].play=-1;
+    L->s[0].reset_ctr=0; L->s[1].reset_ctr=0;
+}
 
 static void *maze_create(const char *dir,const char *cfg){
     (void)dir;(void)cfg;
@@ -168,6 +197,7 @@ static void *maze_create(const char *dir,const char *cfg){
     rng_state^=(uint32_t)(uintptr_t)L|0x9e3779b9u;
     seq_randomize(&L->s[0]); seq_randomize(&L->s[1]);
     L->s[0].cv_range=50; L->s[1].cv_range=50;
+    L->s[0].reset_bars=0; L->s[1].reset_bars=0;   /* default: off (never reset) */
     transport_reset(L);
     return L;
 }
@@ -219,6 +249,10 @@ static void maze_set_param(void *inst,const char *key,const char *val){
     else if (!strcmp(key,"s2_length"))   L->s[1].length   = (v<1?1:(v>8?8:v));
     else if (!strcmp(key,"s2_bit_flip")){ if(trig_fired(val)){ int p=L->s[1].play<0?0:L->s[1].play; L->s[1].bit[p]=!L->s[1].bit[p]; if(L->s[1].bit[p])L->s[1].cv[p]=rng_bip(); } }
     else if (!strcmp(key,"s2_advance")){ if(trig_fired(val)){ int n=L->s[1].length<1?1:L->s[1].length; L->s[1].play=(L->s[1].play+1)%n; } }
+    /* Sequence Reset (in bars): per-seq, or g_reset for both at once */
+    else if (!strcmp(key,"s1_reset"))    L->s[0].reset_bars=reset_bars_from_idx(v);
+    else if (!strcmp(key,"s2_reset"))    L->s[1].reset_bars=reset_bars_from_idx(v);
+    else if (!strcmp(key,"g_reset")){ int rb=reset_bars_from_idx(v); L->s[0].reset_bars=rb; L->s[1].reset_bars=rb; }
     /* trig_mix and its alias trig_mix_b both drive the SAME value (in sync) */
     else if (!strcmp(key,"trig_mix"))    L->trig_mix=(v<-63?-63:(v>64?64:v));
     else if (!strcmp(key,"trig_mix_b"))  L->trig_mix=(v<-63?-63:(v>64?64:v));
@@ -242,6 +276,9 @@ static int maze_get_param(void *inst,const char *key,char *buf,int len){
     else if (!strcmp(key,"s2_length"))   v=L->s[1].length;
     else if (!strcmp(key,"trig_mix"))    v=L->trig_mix;
     else if (!strcmp(key,"trig_mix_b"))  v=L->trig_mix;   /* alias -> same value */
+    else if (!strcmp(key,"s1_reset"))    v=reset_idx_from_bars(L->s[0].reset_bars);
+    else if (!strcmp(key,"s2_reset"))    v=reset_idx_from_bars(L->s[1].reset_bars);
+    else if (!strcmp(key,"g_reset"))     v=reset_idx_from_bars(L->s[0].reset_bars);
     else if (!strcmp(key,"scale"))       v=L->scale;
     else if (!strcmp(key,"note_rate"))   v=L->rate;
     else if (!strcmp(key,"note_length")) v=L->gate;

@@ -2,7 +2,7 @@
   "id": "maze-voice",
   "name": "Maze Voice",
   "abbrev": "MAZE",
-  "version": "0.3.6",
+  "version": "1.2.0",
   "description": "Monophonic Moog Labyrinth-style thru-zero oscillator / wavefolder / state-variable filter voice.",
   "author": "sd88me",
   "dsp": "dsp.so",

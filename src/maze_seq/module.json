@@ -1,8 +1,8 @@
 {
     "id": "maze_seq",
     "name": "Maze",
-    "version": "1.0.0",
-    "author": "Sam Di Domizio",
+    "version": "1.2.0",
+    "author": "sd88me",
     "description": "Dual generative sequencer (Moog Labyrinth style) with pad + step-button control.",
     "component_type": "tool",
     "dsp": "dsp.so",

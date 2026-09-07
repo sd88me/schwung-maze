@@ -24,6 +24,7 @@ the matching monosynth: pair it in a Signal Chain slot behind Maze Lite.
 - **Range (0–100)** — bipolar pitch spread around the root.
 - **Trig Mix** — velocity cross-fade between Seq 1 and Seq 2 (−63 = Seq1 only @127, centre = both @100, +64 = Seq2 only @127).
 - **Length / Bit Flip / Advance** per sequencer.
+- **Sequence Reset** — snap a sequencer's play head back to step 1 every 1 / 2 / 4 / 8 bars (or Off). Bar-aligned at any Note Rate. Per-sequencer in Maze Lite, plus a **Reset Both** control that resets both together (also the 8th knob on Maze's SEQUENCERS page).
 - **12 scales**, selectable key, note-rate (1/32…1 bar), gate length (1/4…2 steps).
 - **Clock-synced** to the Move transport (24 PPQN, start/stop/continue).
 - **Pattern + position persistence** (Maze tool) — survives exit.
@@ -45,17 +46,18 @@ the matching monosynth: pair it in a Signal Chain slot behind Maze Lite.
 - **Knobs — Sequencers page:**
   1 - Corrupt, 2 - Range, 3 - Length (Seq1, red LEDs);
   4 - Trig Mix (red/white/blue LED);
-  5 - Corrupt, 6 - Range, 7 - Length (Seq2, blue LEDs).
+  5 - Corrupt, 6 - Range, 7 - Length (Seq2, blue LEDs);
+  8 - Reset Both, in bars (orange when armed, off when Off).
 - **Knobs — Global page:** 1 Scale, 2 Key, 3 Note Rate, 4 Note Length (white LEDs);
   5 - Seq1 MIDI Channel, 6 - MIDI Seq2 Channel (green LEDs).
 - **Back** = hide (keeps playing in the background); **Shift+Back** = exit.
 
 ### Maze Lite (slot MIDI FX)
 Insert in a MIDI-FX slot, route to a synth, press Play. Pages in order:
-- **Sequencer 1:** Corrupt, Range, Length, Bit Flip, Advance, Trig Mix.
-- **Sequencer 2:** Corrupt, Range, Length, Bit Flip, Advance, Trig Mix (same
-  Trig Mix as page 1, kept in sync).
-- **Global:** Scale, Note Rate, Note Length.
+- **Sequencer 1:** Corrupt, Range, Length, Bit Flip, Advance, Reset, Trig Mix.
+- **Sequencer 2:** Corrupt, Range, Length, Bit Flip, Advance, Reset, Trig Mix
+  (same Trig Mix as page 1, kept in sync).
+- **Global:** Scale, Note Rate, Note Length, Reset Both.
 
 Bit Flip and Advance are momentary buttons (fire once per press/turn). Incoming
 notes set the root (transpose).
@@ -159,7 +161,7 @@ Module Store, open a PR adding the entries in `catalog-entries.json` to
 
 ## Credits & license
 
-Created by Sam Di Domizio. Inspired by the dual generative sequencer of the
+Created by sd88me. Inspired by the dual generative sequencer of the
 Moog Labyrinth (concept only; original code). Built for
 [Schwung](https://github.com/charlesvestal/schwung) by Charles Vestal.
 
