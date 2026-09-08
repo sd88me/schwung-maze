@@ -1,16 +1,16 @@
 {
   "modules": {
     "maze_seq": {
-      "version": "1.2.0",
-      "download_url": "https://github.com/sd88me/schwung-maze/releases/download/v1.2.0/maze_seq-module.tar.gz"
+      "version": "1.2.1",
+      "download_url": "https://github.com/sd88me/schwung-maze/releases/download/v1.2.1/maze_seq-module.tar.gz"
     },
     "maze_seq_lite": {
-      "version": "1.2.0",
-      "download_url": "https://github.com/sd88me/schwung-maze/releases/download/v1.2.0/maze_seq_lite-module.tar.gz"
+      "version": "1.2.1",
+      "download_url": "https://github.com/sd88me/schwung-maze/releases/download/v1.2.1/maze_seq_lite-module.tar.gz"
     },
     "maze-voice": {
-      "version": "1.2.0",
-      "download_url": "https://github.com/sd88me/schwung-maze/releases/download/v1.2.0/maze-voice-module.tar.gz"
+      "version": "1.2.1",
+      "download_url": "https://github.com/sd88me/schwung-maze/releases/download/v1.2.1/maze-voice-module.tar.gz"
     }
   }
 }

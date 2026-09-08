@@ -3,7 +3,7 @@
   "id": "maze_seq_lite",
   "name": "Maze Lite",
   "abbrev": "MZL",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "sd88me",
   "description": "Dual generative clock-synced sequencer (Moog Labyrinth style). Slot MIDI FX.",
   "dsp": "dsp.so",

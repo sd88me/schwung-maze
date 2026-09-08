@@ -1,7 +1,7 @@
 {
     "id": "maze_seq",
     "name": "Maze",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "author": "sd88me",
     "description": "Dual generative sequencer (Moog Labyrinth style) with pad + step-button control.",
     "component_type": "tool",

@@ -2,7 +2,7 @@
   "id": "maze-voice",
   "name": "Maze Voice",
   "abbrev": "MAZE",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Monophonic Moog Labyrinth-style thru-zero oscillator / wavefolder / state-variable filter voice.",
   "author": "sd88me",
   "dsp": "dsp.so",
@@ -62,9 +62,9 @@
       "levels": {
         "root": {
           "label": "Voice",
-          "knobs": ["vco_tune", "mod_freq", "fm_depth", "fm_eg1", "vco_eg1", "mod_eg1", "env2_decay"],
+          "knobs": ["vco_tune", "mod_freq", "fm_depth", "fm_eg1", "vco_eg1", "mod_eg1", "env1_decay", "env2_decay"],
           "params": [
-            "vco_tune", "mod_freq", "fm_depth", "fm_eg1", "vco_eg1", "mod_eg1", "env2_decay",
+            "vco_tune", "mod_freq", "fm_depth", "fm_eg1", "vco_eg1", "mod_eg1", "env1_decay", "env2_decay",
             { "level": "wavefolder", "label": "WaveFolder" },
             { "level": "filter",     "label": "Filter" },
             { "level": "tone",       "label": "Tone" },
@@ -79,8 +79,8 @@
         },
         "filter": {
           "label": "Filter",
-          "knobs": ["cutoff", "reso", "filter_mode", "env1_decay", "cutoff_eg1", "cutoff_key", "route", "blend"],
-          "params": ["cutoff", "reso", "filter_mode", "env1_decay", "cutoff_eg1", "cutoff_key"]
+          "knobs": ["cutoff", "reso", "filter_mode", "cutoff_eg1", "cutoff_key", "route", "blend"],
+          "params": ["cutoff", "reso", "filter_mode", "cutoff_eg1", "cutoff_key"]
         },
         "tone": {
           "label": "Tone",
