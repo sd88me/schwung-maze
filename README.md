@@ -52,6 +52,7 @@ recreation of the Labyrinth's dual generative sequencer section.
 - **Knobs — Global page:** 1 Scale, 2 Key, 3 Note Rate, 4 Note Length (white LEDs);
   5 - Seq1 MIDI Channel, 6 - MIDI Seq2 Channel (green LEDs).
 - **Back** = hide (keeps playing in the background); **Shift+Back** = exit.
+- **Remote UI** — open Maze's panel from Schwung Manager for a browser control surface: both sequencers' Bits (click a step to flip it directly, same as the hardware) with a genuinely live-tracking play head, Corrupt/Range/Length/Trig Mix/Reset/Advance, the Global page, and Panic.
 
 
 ### Maze Seq Lite (slot MIDI FX)
@@ -63,6 +64,7 @@ Insert in a MIDI-FX slot, route to a synth, press Play. Pages in order:
 
 - Bit Flip and Advance are momentary buttons (fire once per press/turn). 
 - Incoming notes set the root (transpose).
+- **Remote UI** — a browser panel with all of the above. No live pattern/play-head display: a chain-slot module doesn't get the live-state push a Tool-tab module (Maze, above) does in this version of Schwung, so Bit Flip/Advance still act on the real sequence, just without a visual readout here.
 
 ---
 
@@ -78,8 +80,8 @@ wavefolder and a state-variable filter (LP→BP morph) in switchable routing
 - **Ring modulation** of the two oscillators
 - **Variable‑tone noise** generator, morphing dark → bright.
 - **Diode/transistor‑style wavefolder** (VCW) with a **Bias** control for asymmetric folding (even vs odd harmonic emphasis).
-- **2‑pole state‑variable filter** morphing continuously from **lowpass → bandpass**, with resonance up to near self‑oscillation that keeps its low end intact.
-- **3‑way ORDER routing** — `VCW>VCF`, `Parallel`, or `VCF>VCW` — with a bipolar **Blend** crossfader between the wavefolder and filter paths.
+- **2‑pole state‑variable filter** morphing continuously from **lowpass → bandpass**, with resonance up to near self‑oscillation that keeps its low end intact, plus a **Filt Drive** stage into the filter input for MS‑20‑style grit.
+- **3‑way ORDER routing** — `VCW>VCF`, `Parallel`, or `VCF>VCW` (set on the WaveFolder page) — with a bipolar **Blend** crossfader between the wavefolder and filter paths (available on both the WaveFolder and Filter pages).
 - **Two decay‑only envelopes** — EG1 (modulation) and EG2 (VCA amp) — with a musically weighted, exponential time response from 5ms to 2s.
 
 ### Analog character
@@ -95,6 +97,7 @@ wavefolder and a state-variable filter (LP→BP morph) in switchable routing
 - **Keyboard tracking depth** per oscillator (Mod Routing page), a Move‑native stand‑in for the hardware's 1V/oct inputs.
 - **Randomise page** — arm any of Voice / WaveFolder / Filter / Tone with per‑page toggles, then hit **Generate** to randomise all armed pages at once.
 - **Preset save/recall** of the full patch, including the Randomise toggles.
+- **Remote UI** — open Maze Voice's panel from Schwung Manager for a browser control surface laid out from the real Labyrinth panel: Oscillators, Mixer, Wavefolder → Filter, Output, all live two‑way synced with the device.
 
 ## Signal Flow
 
@@ -127,7 +130,7 @@ wavefolder and a state-variable filter (LP→BP morph) in switchable routing
      │     ┌── VCW: Wavefolder (+ Bias) ──┐                │
      │     │                              │                │
      │     └── VCF: State-Variable Filter ┘   (LP ◄─► BP)  │
-     │              cutoff · reso · mode                   │
+     │              cutoff · reso · mode · drive            │
      │                                                     │
      │            BLEND  (fold ◄─────► filter)             │
      └───────────────────────┬─────────────────────────────┘

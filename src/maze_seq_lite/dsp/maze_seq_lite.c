@@ -16,6 +16,16 @@
  *  - trig_mix_b is an alias of trig_mix so the same Trig Mix control can live on
  *    both the Seq1 and Seq2 pages, always in sync (they read/write one variable).
  *
+ * v1.3.2 change — Remote UI (web_ui.html) live sync, all read-only additions
+ * to get_param (no set_param, nothing here writes any of it):
+ *   - "running": mirrors L->running (already existed for gating clock
+ *     pulses, 0xF8) so the panel can tell transport stopped from playing.
+ *   - "s1_bits"/"s2_bits": the real 8-step bit pattern as a "10110010"-
+ *     style string, so the panel's Bits LEDs show the actual sequence
+ *     instead of a locally-simulated stand-in.
+ *   - "s1_play"/"s2_play": the current step index, so the panel's playhead
+ *     tracks the real one instead of a local timer guessing at it.
+ *
  * No file I/O here, so nothing to move off the audio thread (unlike the tool).
  * You (a non-coder) only ever need to touch bits marked  ==>> EDIT ME.
  * ===========================================================================*/
@@ -267,6 +277,20 @@ static int maze_get_param(void *inst,const char *key,char *buf,int len){
     if (!strcmp(key,"s1_bit_flip")||!strcmp(key,"s1_advance")||
         !strcmp(key,"s2_bit_flip")||!strcmp(key,"s2_advance"))
         return snprintf(buf,len,"off");
+    /* read-only transport/pattern state for the Remote UI (not chain_params
+     * — nothing on the device's own knob grid needs them). bits is an
+     * 8-char '0'/'1' string, step 0 first; play is the current step index
+     * (-1 before the first clock pulse). */
+    if (!strcmp(key,"running")) return snprintf(buf,len,"%d",L->running);
+    if (!strcmp(key,"s1_bits")||!strcmp(key,"s2_bits")){
+        seq_t *q=&L->s[key[1]=='1'?0:1];
+        char bits[NUM_STEPS+1];
+        for (int i=0;i<NUM_STEPS;i++) bits[i]=q->bit[i]?'1':'0';
+        bits[NUM_STEPS]='\0';
+        return snprintf(buf,len,"%s",bits);
+    }
+    if (!strcmp(key,"s1_play")) return snprintf(buf,len,"%d",L->s[0].play);
+    if (!strcmp(key,"s2_play")) return snprintf(buf,len,"%d",L->s[1].play);
     int v;
     if      (!strcmp(key,"s1_corrupt"))  v=L->s[0].corrupt;
     else if (!strcmp(key,"s1_cv_range")) v=L->s[0].cv_range;

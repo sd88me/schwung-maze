@@ -84,6 +84,10 @@ static inline int reset_bars_from_idx(int idx){
     if (idx>=NUM_RESETS) idx=NUM_RESETS-1;
     return RESET_BARS[idx];
 }
+static inline int reset_idx_from_bars(int bars){
+    for (int i=0;i<NUM_RESETS;i++) if (RESET_BARS[i]==bars) return i;
+    return NUM_RESETS-1;   /* unknown -> off */
+}
 
 #define MAX_SPREAD 64   /* ==>> EDIT ME: semitone spread each side of root */
 
@@ -387,11 +391,44 @@ static void maze_set_param(void *inst, const char *key, const char *val){
     else if (!strcmp(key,"save")){ L->state_dirty=1; }
 }
 
+/* Remote UI (Tool tab) contract, see docs/MODULES.md "Remote UI for overtake
+ * tools": answer get_param("module_id") so the manager can discover us, and
+ * get_param("state") with a flat JSON object of string values so the manager
+ * seeds AND periodically refreshes the browser (toolTickLoop polls "state"
+ * on an adaptive ~100ms-while-active cadence for tools that don't implement
+ * the optional rui_poll fast path — this module doesn't, and doesn't need
+ * to: an 8-step sequencer has no business updating faster than that).
+ * s1_bits/s2_bits/s1_play/s2_play/running mirror ui.js's own s1_state/
+ * s2_state polling (same underlying data, JSON instead of pipe-delimited,
+ * for the remote-ui side specifically). Every other field here mirrors a
+ * knob ui.js already owns (see U{} in ui.js) so the remote panel and the
+ * on-device screen never disagree about what a knob is currently set to. */
+static int build_state_json(const maze_t *L, char *buf, int buf_len){
+    char b1[NUM_STEPS+1], b2[NUM_STEPS+1];
+    for (int i=0;i<NUM_STEPS;i++){ b1[i]=L->s[0].bit[i]?'1':'0'; b2[i]=L->s[1].bit[i]?'1':'0'; }
+    b1[NUM_STEPS]='\0'; b2[NUM_STEPS]='\0';
+    int g_reset_idx = reset_idx_from_bars(L->s[0].reset_bars);
+    int n = snprintf(buf, (size_t)buf_len,
+        "{\"running\":\"%d\","
+        "\"s1_bits\":\"%s\",\"s1_play\":\"%d\",\"s1_length\":\"%d\",\"s1_corrupt\":\"%d\",\"s1_cv_range\":\"%d\",\"s1_channel\":\"%d\","
+        "\"s2_bits\":\"%s\",\"s2_play\":\"%d\",\"s2_length\":\"%d\",\"s2_corrupt\":\"%d\",\"s2_cv_range\":\"%d\",\"s2_channel\":\"%d\","
+        "\"trig_mix\":\"%d\",\"scale\":\"%d\",\"key\":\"%d\",\"note_rate\":\"%d\",\"note_length\":\"%d\",\"g_reset\":\"%d\","
+        "\"pad_semis\":\"%d\"}",
+        L->running?1:0,
+        b1, L->s[0].play, L->s[0].length, L->s[0].corrupt, L->s[0].cv_range, L->s[0].channel,
+        b2, L->s[1].play, L->s[1].length, L->s[1].corrupt, L->s[1].cv_range, L->s[1].channel,
+        L->trig_mix, L->scale, L->key, L->rate, L->gate, g_reset_idx,
+        L->pad_semis);
+    if (n<0) return -1; if (n>=buf_len) n=buf_len-1;
+    return n;
+}
 static int maze_get_param(void *inst, const char *key, char *buf, int buf_len){
     maze_t *L=(maze_t*)inst;
     if(!L||!key||!buf||buf_len<2) return -1;
     int n=0;
     if (!strcmp(key,"running")) n=snprintf(buf,buf_len,"%d",L->running?1:0);
+    else if (!strcmp(key,"module_id")) n=snprintf(buf,buf_len,"maze_seq");
+    else if (!strcmp(key,"state")) return build_state_json(L,buf,buf_len);
     else if (!strcmp(key,"s1_state")||!strcmp(key,"s2_state")){
         seq_t *q=&L->s[key[1]=='2'?1:0];
         int off=snprintf(buf,buf_len,"%d|",q->length);

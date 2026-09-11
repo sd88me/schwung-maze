@@ -40,6 +40,7 @@ docker run --rm -v "$PWD":/build -w /build "$IMG" bash -euxc '
   cp src/maze_seq/module.json dist/maze_seq/
   cp src/maze_seq/ui.js       dist/maze_seq/
   cp src/maze_seq/help.json   dist/maze_seq/
+  [ -f src/maze_seq/web_ui.html ] && cp src/maze_seq/web_ui.html dist/maze_seq/
 
   # ---- maze_seq_lite (slot MIDI FX) ----
   mkdir -p dist/maze_seq_lite
@@ -48,6 +49,7 @@ docker run --rm -v "$PWD":/build -w /build "$IMG" bash -euxc '
       -o dist/maze_seq_lite/dsp.so -lm
   cp src/maze_seq_lite/module.json dist/maze_seq_lite/
   cp src/maze_seq_lite/help.json   dist/maze_seq_lite/
+  [ -f src/maze_seq_lite/web_ui.html ] && cp src/maze_seq_lite/web_ui.html dist/maze_seq_lite/
 
   # ---- maze-voice (chainable sound generator, plugin_api_v2) ----
   mkdir -p dist/maze-voice
@@ -58,6 +60,7 @@ docker run --rm -v "$PWD":/build -w /build "$IMG" bash -euxc '
       || { echo "maze-voice: dsp.so is missing move_plugin_init_v2" >&2; exit 1; }
   cp src/maze-voice/module.json dist/maze-voice/
   cp src/maze-voice/help.json   dist/maze-voice/
+  [ -f src/maze-voice/web_ui.html ] && cp src/maze-voice/web_ui.html dist/maze-voice/
 
   # confirm the .so files are really ARM64
   file dist/maze_seq/dsp.so dist/maze_seq_lite/dsp.so dist/maze-voice/dsp.so

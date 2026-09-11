@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Maze</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --cheek: #0c0b0a; --cheek-hi: #201d19; --cheek-edge: #000;
+    --plate: #131211; --plate-hi: #1c1a17; --plate-shadow: #060605;
+    --plate-line: rgba(255, 255, 255, 0.09); --plate-line-strong: rgba(255, 255, 255, 0.18);
+    --ink: #efe9d8; --ink-dim: #8f8878; --ink-faint: #5c584c;
+    --metal-hi: #f2f1ee; --metal-lo: #8f8e89;
+    --accent: #c1552f; --led-off: #2c2620; --led-on: #e2793f;
+    --bg: #0a0a08;
+  }
+
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); }
+  body { font-family: "Archivo", ui-sans-serif, system-ui, sans-serif; padding: 10px; overflow-x: auto; color: var(--ink); }
+
+  /* ---- top bar ---- */
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 6px 10px 10px; }
+  .topbar .name { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 0.04em; color: var(--ink); }
+  .topbar .status { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); display: flex; align-items: center; gap: 6px; }
+  .topbar .status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--led-off); }
+  .topbar .status.live .dot { background: var(--led-on); box-shadow: 0 0 5px var(--led-on); }
+  .panic-btn, .sync-btn { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 4px; padding: 5px 10px; cursor: pointer; border: 1px solid var(--plate-line); }
+  .sync-btn { color: var(--ink-dim); background: #1c1a17; }
+  .sync-btn:active { background: #26231e; }
+  .panic-btn { color: #fdf3ea; background: linear-gradient(180deg, var(--accent), #7f2f1e); border-color: transparent; margin-left: auto; }
+  .panic-btn:active { transform: translateY(1px); }
+
+  /* ------------------------------------------------------------------ */
+  /* Rack                                                                 */
+  /* ------------------------------------------------------------------ */
+  .rack { display: grid; grid-template-columns: 20px 1fr 20px; width: fit-content; border-radius: 8px; overflow: hidden; box-shadow: 0 20px 44px -22px rgba(0,0,0,0.6), 0 2px 0 rgba(0,0,0,0.3); }
+  .cheek { background: linear-gradient(180deg, var(--cheek-hi), var(--cheek) 45%, var(--cheek-edge)); position: relative; }
+  .cheek::before, .cheek::after { content: ""; position: absolute; left: 50%; width: 6px; height: 6px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #5a5650, #100e0b 70%); transform: translateX(-50%); }
+  .cheek::before { top: 14px; } .cheek::after { bottom: 14px; }
+
+  .plate { background: repeating-linear-gradient(115deg, rgba(255,255,255,0.014) 0 1px, transparent 1px 3px), linear-gradient(150deg, var(--plate-hi), var(--plate) 45%, var(--plate-shadow)); padding: 20px 22px 14px; position: relative; color: var(--ink); }
+  .screw { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #8b8578, #423e35 60%, #1c1a16 100%); box-shadow: 0 1px 2px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.4); }
+  .screw::before, .screw::after { content: ""; position: absolute; top: 50%; left: 50%; background: #17150f; transform: translate(-50%, -50%) rotate(45deg); }
+  .screw::before { width: 6.5px; height: 1.3px; } .screw::after { width: 1.3px; height: 6.5px; }
+  .screw.tl { top: 9px; left: 9px; } .screw.tr { top: 9px; right: 9px; }
+  .screw.bl { bottom: 9px; left: 9px; } .screw.br { bottom: 9px; right: 9px; }
+
+  .panel-rows { display: flex; flex-direction: column; gap: 0; padding-block: 4px 6px; }
+  .section { display: flex; flex-direction: column; gap: 8px; padding-inline: 2px; }
+  .section + .section { border-top: 1px solid var(--plate-line); padding-top: 12px; margin-top: 2px; }
+  .section-title { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); border-bottom: 1px solid var(--plate-line-strong); padding-bottom: 5px; }
+
+  .stack { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .stack-row { display: flex; gap: 12px; align-items: flex-start; flex: 1; }
+  .stack-row.mid { flex: 0 0 auto; gap: 16px; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .stage { height: 56px; display: flex; align-items: center; justify-content: center; }
+  .topline { height: 10px; width: 34px; display: flex; align-items: center; justify-content: center; }
+  .topline.polarity { justify-content: space-between; font-size: 8px; color: var(--ink-faint); }
+
+  /* ---- captions ---- */
+  .cap-label { font-family: "Barlow Condensed", sans-serif; font-weight: 600; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; text-align: center; color: var(--ink); line-height: 1.15; white-space: nowrap; }
+  .kval { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 8.5px; color: var(--ink-faint); height: 10px; line-height: 10px; font-variant-numeric: tabular-nums; }
+
+  /* ---- knob: generated SVG, fluted skirt + brushed-metal cap ---- */
+  .knob-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .knob-wrap.small .knob-svg { width: 33px; height: 33px; }
+  .knob-wrap.big .knob-svg { width: 52px; height: 52px; }
+  .knob-svg { cursor: ns-resize; touch-action: none; overflow: visible; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+
+  /* ---- stepper: cycling enum readout ---- */
+  .stepper-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .stepper-wrap .stage { height: 56px; }
+  .step-box { width: 62px; height: 26px; border-radius: 4px; cursor: pointer; background: #050403;
+    box-shadow: inset 0 1px 4px rgba(0,0,0,0.7), 0 0 0 1px var(--plate-line);
+    display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+  .step-box .txt { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; color: var(--led-on);
+    text-shadow: 0 0 5px rgba(226,121,63,0.45); text-align: center; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---- bits strip: 8-step pattern, click to flip that step, lit playhead ---- */
+  .bits-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bits-strip { display: flex; gap: 3px; }
+  .bit-led { width: 10px; height: 10px; border-radius: 2px; cursor: pointer;
+    background: #1c1a17; box-shadow: inset 0 1px 2px rgba(0,0,0,0.6), 0 0 0 1px var(--plate-line); }
+  .bit-led.on { background: linear-gradient(180deg, var(--led-on), #a1451c); box-shadow: 0 0 4px var(--led-on), inset 0 0 0 1px rgba(0,0,0,0.3); }
+  .bit-led.play { box-shadow: 0 0 0 2px var(--metal-hi), 0 0 7px rgba(242,241,238,0.7); }
+  .bit-led.play.on { box-shadow: 0 0 0 2px var(--metal-hi), 0 0 8px var(--led-on); }
+
+  /* ---- momentary button: Advance ---- */
+  .btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .btn-wrap .stage { height: 56px; flex-direction: row; gap: 4px; }
+  .go-btn { width: 22px; height: 26px; border-radius: 4px; cursor: pointer; border: none;
+    font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 11px;
+    color: var(--ink-dim); background: linear-gradient(180deg, #2c2925, #17150f); box-shadow: 0 2px 0 #000, inset 0 1px 0 rgba(255,255,255,0.06); }
+  .go-btn:active, .go-btn.flash { color: #fdf3ea; background: linear-gradient(180deg, var(--accent), #7f2f1e); transform: translateY(1px); box-shadow: 0 1px 0 #000; }
+
+  .plate-foot { display: flex; align-items: baseline; justify-content: center; gap: 10px; padding: 10px 0 2px; }
+  .wordmark { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.04em; color: var(--ink); }
+  .tagline { font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+  .xpose { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 9px; color: var(--ink-faint); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="name">MAZE</span>
+  <span class="status" id="status"><span class="dot"></span><span id="statusText">Connecting&hellip;</span></span>
+  <button class="sync-btn" id="sync" title="Force a full re-sync from the device">&#8635; Sync</button>
+  <button class="panic-btn" id="panic" title="All notes off">Panic</button>
+</div>
+
+<div class="rack" aria-label="Maze control panel">
+  <div class="cheek" aria-hidden="true"></div>
+  <div class="plate">
+    <span class="screw tl" aria-hidden="true"></span><span class="screw tr" aria-hidden="true"></span>
+    <span class="screw bl" aria-hidden="true"></span><span class="screw br" aria-hidden="true"></span>
+    <div class="panel-rows" id="panelRows"></div>
+    <div class="plate-foot">
+      <span class="wordmark">MAZE</span><span class="tagline">Dual Generative Sequencer &middot; for Move</span>
+      <span class="xpose" id="xpose">Xpose +0</span>
+    </div>
+  </div>
+  <div class="cheek" aria-hidden="true"></div>
+</div>
+
+<script src="/static/schwung-remote-api.js"></script>
+<script>
+"use strict";
+
+/* fallback so the page still renders for local preview outside the manager */
+if (!window.schwungRemote) {
+  const _store = {};
+  window.schwungRemote = {
+    getParam: (k) => Promise.resolve(_store[k]),
+    setParam: (k, v) => { _store[k] = String(v); },
+    onParamChange: () => {},
+    getHierarchy: () => Promise.resolve(null),
+    getChainParams: () => Promise.resolve(null),
+  };
+}
+
+/* Overtake tool (Tool tab), NOT a chain slot — the manager's fixed key
+ * prefix for tool params is "overtake_dsp:" (schwung-manager/remote_ui.go's
+ * overtakeParamPrefix; confirmed against remote-ui.js's tool.params[msg.key]
+ * lookup too), not "tool:" or the module id. This is also why the Bits
+ * strip below can actually be live: overtake tools get a real adaptive
+ * server-side poll of get_param("state") — up to every ~100ms while
+ * active — unlike an ordinary chain-slot module, which has no live-read
+ * path at all (see maze_seq_lite's web_ui.html for that story). */
+const P = "overtake_dsp:";
+const SVG_NS = "http://www.w3.org/2000/svg";
+let uid = 0;
+
+function pct(min, max, def) { return (def - min) / (max - min); }
+function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
+const registry = {}; /* key -> { set(rawStr) } — used for seed + live sync */
+
+/* ---------------------------------------------------------------------
+ * SVG knob: an 8-flute scalloped skirt (sampled, not hand-authored path
+ * data) + a brushed-metal cap + a dark pointer tab, rotating as one piece.
+ * ------------------------------------------------------------------- */
+function scallopPoints(cx, cy, rBase, rAmp, n, samples) {
+  const pts = [];
+  for (let i = 0; i <= samples; i++) {
+    const t = (i / samples) * Math.PI * 2;
+    const r = rBase + rAmp * Math.cos(n * t);
+    pts.push((cx + r * Math.cos(t)).toFixed(2) + "," + (cy + r * Math.sin(t)).toFixed(2));
+  }
+  return pts.join(" ");
+}
+function svgEl(tag, attrs) { const el = document.createElementNS(SVG_NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); return el; }
+function buildKnobSvg() {
+  const id = "kg" + (uid++);
+  const svg = svgEl("svg", { viewBox: "0 0 100 100", class: "knob-svg" });
+  const defs = svgEl("defs", {});
+  defs.innerHTML =
+    '<radialGradient id="' + id + '-skirt" cx="36%" cy="28%" r="80%">' +
+      '<stop offset="0%" stop-color="#4c4842"/><stop offset="55%" stop-color="#201e1a"/><stop offset="100%" stop-color="#030302"/>' +
+    '</radialGradient>' +
+    '<linearGradient id="' + id + '-cap" x1="12%" y1="8%" x2="88%" y2="92%">' +
+      '<stop offset="0%" stop-color="#f4f3f0"/><stop offset="42%" stop-color="#aeada8"/><stop offset="52%" stop-color="#96958f"/><stop offset="100%" stop-color="#e2e0da"/>' +
+    '</linearGradient>';
+  svg.appendChild(defs);
+  const rotor = svgEl("g", { class: "rotor" });
+  rotor.appendChild(svgEl("polygon", { points: scallopPoints(50, 50, 40, 7, 8, 96), fill: "url(#" + id + "-skirt)", stroke: "#000", "stroke-width": "0.6" }));
+  rotor.appendChild(svgEl("circle", { cx: "50", cy: "50", r: "29", fill: "url(#" + id + "-cap)", stroke: "#75746e", "stroke-width": "0.6" }));
+  rotor.appendChild(svgEl("rect", { x: "47.2", y: "23", width: "5.6", height: "14", rx: "1.6", fill: "#201f1c" }));
+  svg.appendChild(rotor);
+  return { svg, rotor };
+}
+
+function makeKnob(item) {
+  const wrap = document.createElement("div");
+  wrap.className = "knob-wrap " + (item.size || "small");
+  const { svg, rotor } = buildKnobSvg();
+  const stage = document.createElement("div"); stage.className = "stage"; stage.appendChild(svg);
+  const val = document.createElement("div"); val.className = "kval";
+  const cap = document.createElement("div"); cap.className = "cap-label"; cap.textContent = item.cap;
+  const topline = document.createElement("div"); topline.className = "topline";
+  if (item.bipolar) { topline.classList.add("polarity"); topline.innerHTML = "<span>&minus;</span><span>+</span>"; }
+
+  wrap.appendChild(stage); wrap.appendChild(topline); wrap.appendChild(val); wrap.appendChild(cap);
+
+  let cur = pct(item.min, item.max, item.def);
+  function render(frac) {
+    cur = clamp01(frac);
+    rotor.setAttribute("transform", "rotate(" + (-132 + cur * 264) + " 50 50)");
+    const raw = item.min + cur * (item.max - item.min);
+    val.textContent = (item.bipolar && raw >= 0 ? "+" : "") + Math.round(raw);
+  }
+  function commit(frac) {
+    render(frac);
+    const raw = Math.round(item.min + cur * (item.max - item.min));
+    schwungRemote.setParam(P + item.key, String(raw));
+  }
+
+  let dragging = false, startY = 0, startV = 0;
+  function down(e) { dragging = true; startY = (e.touches ? e.touches[0].clientY : e.clientY); startV = cur; e.preventDefault();
+    window.addEventListener("mousemove", move); window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("mouseup", up); window.addEventListener("touchend", up); }
+  function move(e) { if (!dragging) return; const y = (e.touches ? e.touches[0].clientY : e.clientY); const speed = e.shiftKey ? 640 : 180;
+    commit(startV + (startY - y) / speed); e.preventDefault(); }
+  function up() { dragging = false; window.removeEventListener("mousemove", move); window.removeEventListener("touchmove", move);
+    window.removeEventListener("mouseup", up); window.removeEventListener("touchend", up); }
+  svg.addEventListener("mousedown", down);
+  svg.addEventListener("touchstart", down, { passive: false });
+  svg.addEventListener("wheel", (e) => { commit(cur - Math.sign(e.deltaY) * 0.02); e.preventDefault(); }, { passive: false });
+  svg.addEventListener("dblclick", () => commit(pct(item.min, item.max, item.def)));
+
+  render(cur);
+  /* Ignore live pushes while the user is actively dragging this knob —
+   * the manager's tool poll can land mid-gesture with the pre-drag value,
+   * which without this guard visibly snaps the knob back every ~100ms.
+   * Local input wins for the duration of the gesture; the next push after
+   * release reflects the committed value anyway. */
+  registry[item.key] = { set: (v) => { if (dragging) return; const raw = parseFloat(v); if (!isNaN(raw)) render(clamp01(pct(item.min, item.max, raw))); } };
+  return wrap;
+}
+
+/* ---------------------------------------------------------------------
+ * Stepper — cycling enum readout. Wire value is the numeric option index.
+ * ------------------------------------------------------------------- */
+function makeStepper(item) {
+  const wrap = document.createElement("div"); wrap.className = "stepper-wrap";
+  const stage = document.createElement("div"); stage.className = "stage";
+  const box = document.createElement("div"); box.className = "step-box";
+  const txt = document.createElement("div"); txt.className = "txt";
+  box.appendChild(txt); stage.appendChild(box);
+  const cap = document.createElement("div"); cap.className = "cap-label"; cap.textContent = item.cap;
+
+  let idx = item.def || 0;
+  function render(i) { idx = i; txt.textContent = item.options[idx]; }
+  function commit(i) { render(i); schwungRemote.setParam(P + item.key, String(idx)); }
+  function advance(dir) { commit((idx + dir + item.options.length) % item.options.length); }
+  box.addEventListener("click", (e) => advance(e.shiftKey ? -1 : 1));
+  box.addEventListener("contextmenu", (e) => { e.preventDefault(); advance(-1); });
+  box.addEventListener("wheel", (e) => { advance(-Math.sign(e.deltaY)); e.preventDefault(); }, { passive: false });
+  render(idx);
+
+  wrap.appendChild(stage); wrap.appendChild(cap);
+  registry[item.key] = { set: (v) => { const i = Math.round(parseFloat(v)); if (i >= 0 && i < item.options.length) render(i); } };
+  return wrap;
+}
+
+/* ---------------------------------------------------------------------
+ * Bits strip — the real panel's 8-LED row, genuinely live and clickable
+ * this time: dsp/maze_seq.c's s{1,2}_flip takes an explicit step index
+ * (not "flip whatever's currently playing", unlike Maze Lite), so a click
+ * on any LED is a faithful stand-in for the hardware's per-step buttons.
+ * Data comes from get_param("state")'s s{1,2}_bits/s{1,2}_play, which the
+ * manager polls server-side (toolTickLoop, adaptive ~100ms while active)
+ * and pushes through the normal onParamChange/registry path below — no
+ * client-side polling needed here at all.
+ * ------------------------------------------------------------------- */
+function makeBitsStrip(seqKey) {
+  const wrap = document.createElement("div"); wrap.className = "bits-wrap";
+  const stage = document.createElement("div"); stage.className = "stage";
+  const strip = document.createElement("div"); strip.className = "bits-strip";
+  const leds = [];
+  for (let i = 0; i < 8; i++) {
+    const led = document.createElement("div"); led.className = "bit-led";
+    led.title = "Step " + (i + 1) + " — click to flip";
+    led.addEventListener("click", () => schwungRemote.setParam(P + seqKey + "_flip", String(i)));
+    strip.appendChild(led);
+    leds.push(led);
+  }
+  stage.appendChild(strip);
+  const topline = document.createElement("div"); topline.className = "topline";
+  const val = document.createElement("div"); val.className = "kval";
+  const cap = document.createElement("div"); cap.className = "cap-label"; cap.textContent = "Bits";
+  wrap.appendChild(stage); wrap.appendChild(topline); wrap.appendChild(val); wrap.appendChild(cap);
+
+  const state = { bits: null, play: -1, length: 8, running: false };
+  function render() {
+    leds.forEach((led, i) => {
+      const inRange = i < state.length;
+      led.classList.toggle("on", inRange && !!state.bits && state.bits[i] === "1");
+      led.classList.toggle("play", inRange && i === state.play);
+      led.style.opacity = inRange ? "1" : "0.25";
+    });
+    wrap.style.opacity = state.running ? "1" : "0.7";
+  }
+
+  registry[seqKey + "_bits"] = { set: (v) => { state.bits = v; render(); } };
+  registry[seqKey + "_play"] = { set: (v) => { const p = parseInt(v, 10); state.play = isNaN(p) ? -1 : p; render(); } };
+  /* Length is NOT registered here — the Length knob below already owns
+   * that registry key (one key, one owner); its registration is wrapped
+   * after construction to also call setLength() on this strip, so the
+   * dimming stays in sync without two entries fighting over one key. */
+
+  return { el: wrap, setRunning: (r) => { state.running = r; render(); }, setLength: (l) => { state.length = l; render(); } };
+}
+
+let bits1, bits2; /* assigned once built, below */
+registry["running"] = { set: (v) => {
+  const isRunning = parseFloat(v) >= 0.5;
+  if (bits1) bits1.setRunning(isRunning);
+  if (bits2) bits2.setRunning(isRunning);
+  setStatus(true);
+  document.getElementById("status").classList.toggle("live", isRunning);
+  document.getElementById("statusText").textContent = isRunning ? "Playing — live sync" : "Stopped — live sync";
+} };
+registry["pad_semis"] = { set: (v) => {
+  const n = parseInt(v, 10) || 0;
+  document.getElementById("xpose").textContent = "Xpose " + (n >= 0 ? "+" : "") + n;
+} };
+
+/* ---------------------------------------------------------------------
+ * Momentary buttons — Advance (±1, not "go": s1_adv's value IS the step
+ * direction).
+ * ------------------------------------------------------------------- */
+function makeAdvancePair(seqKey) {
+  const wrap = document.createElement("div"); wrap.className = "btn-wrap";
+  const stage = document.createElement("div"); stage.className = "stage";
+  function mkBtn(label, dir) {
+    const btn = document.createElement("button"); btn.className = "go-btn"; btn.textContent = label;
+    btn.addEventListener("click", () => {
+      schwungRemote.setParam(P + seqKey + "_adv", String(dir));
+      btn.classList.add("flash"); setTimeout(() => btn.classList.remove("flash"), 120);
+    });
+    return btn;
+  }
+  stage.appendChild(mkBtn("◀", -1));
+  stage.appendChild(mkBtn("▶", 1));
+  const cap = document.createElement("div"); cap.className = "cap-label"; cap.textContent = "Advance";
+  wrap.appendChild(stage); wrap.appendChild(cap);
+  return wrap;
+}
+
+/* ---------------------------------------------------------------------
+ * Layout helpers
+ * ------------------------------------------------------------------- */
+function col(children) { const c = document.createElement("div"); c.className = "col"; children.forEach((el) => c.appendChild(el)); return c; }
+function row(cls) { const r = document.createElement("div"); r.className = "stack-row " + (cls || ""); return r; }
+function buildSection(title, rowBuilder) {
+  const s = document.createElement("div"); s.className = "section";
+  const t = document.createElement("div"); t.className = "section-title"; t.textContent = title; s.appendChild(t);
+  const stack = document.createElement("div"); stack.className = "stack";
+  rowBuilder(stack);
+  s.appendChild(stack);
+  return s;
+}
+
+const RESET_OPTS = ["1b", "2b", "4b", "8b", "Off"];
+const SCALE_OPTS = ["Chromatic","Major","Minor","Pent Maj","Pent Min","Mel Min","Harm Min","Whole","Hirajoshi","Major 7","Minor 7","Unquant"];
+const KEY_OPTS = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const RATE_OPTS = ["1/32","1/16","1/8","1/4","1/2","1 bar"];
+const GATE_OPTS = ["1/4","1/2","3/4","1","1 1/4","1 1/2","1 3/4","2"];
+const CHANNEL_OPTS = Array.from({ length: 16 }, (_, i) => String(i + 1));
+
+const panelRows = document.getElementById("panelRows");
+
+/* ---- Sequencer: SEQ 1 row over SEQ 2 row, same order as ui.js's page 1 ---- */
+panelRows.appendChild(buildSection("Sequencer", (stack) => {
+  const top = row(), bot = row(), mid = row("mid");
+
+  top.appendChild(col([ makeKnob({ size:"big", key:"s1_corrupt", cap:"Corrupt", min:0, max:100, def:0 }) ]));
+  bot.appendChild(col([ makeKnob({ size:"big", key:"s2_corrupt", cap:"Corrupt", min:0, max:100, def:0 }) ]));
+
+  bits1 = makeBitsStrip("s1");
+  bits2 = makeBitsStrip("s2");
+  top.appendChild(col([ bits1.el ]));
+  bot.appendChild(col([ bits2.el ]));
+
+  top.appendChild(col([ makeKnob({ size:"small", key:"s1_cv_range", cap:"CV Range", min:0, max:100, def:20 }) ]));
+  bot.appendChild(col([ makeKnob({ size:"small", key:"s2_cv_range", cap:"CV Range", min:0, max:100, def:20 }) ]));
+
+  top.appendChild(col([ makeKnob({ size:"small", key:"s1_length", cap:"Length", min:1, max:8, def:8 }) ]));
+  bot.appendChild(col([ makeKnob({ size:"small", key:"s2_length", cap:"Length", min:1, max:8, def:8 }) ]));
+  /* Fan the Length knob's live updates out to its Bits strip too, so LEDs
+   * past the current length dim, matching ui.js's own desiredLEDs(). */
+  [["s1_length", bits1], ["s2_length", bits2]].forEach(([key, strip]) => {
+    const knobSet = registry[key].set;
+    registry[key] = { set: (v) => { knobSet(v); strip.setLength(parseInt(v, 10) || 8); } };
+  });
+
+  top.appendChild(col([ makeStepper({ key:"s1_channel", cap:"Channel", options:CHANNEL_OPTS, def:0 }) ]));
+  bot.appendChild(col([ makeStepper({ key:"s2_channel", cap:"Channel", options:CHANNEL_OPTS, def:0 }) ]));
+
+  top.appendChild(col([ makeAdvancePair("s1") ]));
+  bot.appendChild(col([ makeAdvancePair("s2") ]));
+
+  mid.appendChild(col([ makeKnob({ size:"big", key:"trig_mix", cap:"Trig Mix", bipolar:true, min:-63, max:64, def:0 }) ]));
+  mid.appendChild(col([ makeStepper({ key:"g_reset", cap:"Reset Both", options:RESET_OPTS, def:4 }) ]));
+
+  stack.appendChild(top);
+  stack.appendChild(mid);
+  stack.appendChild(bot);
+}));
+
+/* ---- Global: shared across both sequencers, stacked under Sequencer ---- */
+panelRows.appendChild(buildSection("Global", (stack) => {
+  const r = row();
+  r.appendChild(col([ makeStepper({ key:"scale", cap:"Scale", options:SCALE_OPTS, def:1 }) ]));
+  r.appendChild(col([ makeStepper({ key:"key", cap:"Key", options:KEY_OPTS, def:0 }) ]));
+  r.appendChild(col([ makeStepper({ key:"note_rate", cap:"Note Rate", options:RATE_OPTS, def:1 }) ]));
+  r.appendChild(col([ makeStepper({ key:"note_length", cap:"Note Len", options:GATE_OPTS, def:3 }) ]));
+  stack.appendChild(r);
+}));
+
+/* ---------------------------------------------------------------------
+ * Live sync — normal registry/onParamChange path. No client-side polling:
+ * the manager's toolTickLoop drives this for an overtake tool.
+ * ------------------------------------------------------------------- */
+function applyParams(params) {
+  let touched = false;
+  for (const fullKey in params) {
+    if (!Object.prototype.hasOwnProperty.call(params, fullKey)) continue;
+    const key = fullKey.indexOf(P) === 0 ? fullKey.slice(P.length) : fullKey;
+    if (registry[key]) { registry[key].set(params[fullKey]); touched = true; }
+  }
+  if (touched) setStatus(true);
+}
+function setStatus(live) {
+  document.getElementById("status").classList.toggle("live", live);
+}
+function seed() {
+  Object.keys(registry).forEach((key) => {
+    schwungRemote.getParam(P + key).then((v) => { if (v !== undefined && v !== null && v !== "") registry[key].set(v); });
+  });
+}
+function forceSync() {
+  document.getElementById("statusText").textContent = "Re-syncing…";
+  try { window.parent.postMessage({ type: "subscribe" }, "*"); } catch (e) {}
+  setTimeout(seed, 250);
+}
+document.getElementById("sync").addEventListener("click", forceSync);
+document.getElementById("panic").addEventListener("click", () => schwungRemote.setParam(P + "panic", "1"));
+
+schwungRemote.onParamChange(applyParams);
+setTimeout(seed, 200);
+</script>
+</body>
+</html>

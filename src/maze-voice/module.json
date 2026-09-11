@@ -2,7 +2,7 @@
   "id": "maze-voice",
   "name": "Maze Voice",
   "abbrev": "MAZE",
-  "version": "1.2.1",
+  "version": "1.3.4",
   "description": "Monophonic Moog Labyrinth-style thru-zero oscillator / wavefolder / state-variable filter voice.",
   "author": "sd88me",
   "dsp": "dsp.so",
@@ -35,10 +35,11 @@
 
       { "key": "cutoff",     "name": "Cutoff",    "type": "float", "min": 0,    "max": 100,  "default": 100, "step": 1,    "display_format": "%.0f" },
       { "key": "reso",       "name": "Resonance", "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
-      { "key": "filter_mode","name": "Filt Mode", "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "filter_mode","name": "LP-BP",     "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
       { "key": "env1_decay", "name": "Env1 Dec",  "type": "float", "min": 0,    "max": 100,  "default": 60,  "step": 1,    "display_format": "%.0f" },
       { "key": "cutoff_eg1", "name": "Cut EG1",   "type": "float", "min": -100, "max": 100,  "default": 30,  "step": 1,    "display_format": "%.0f" },
       { "key": "cutoff_key", "name": "Cut Key",   "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "filt_drive", "name": "Filt Drive","type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
 
       { "key": "vco_lvl",    "name": "VCO Lvl",   "type": "float", "min": 0,    "max": 200,  "default": 100, "step": 1,    "display_format": "%.0f" },
       { "key": "mod_lvl",    "name": "Mod Lvl",   "type": "float", "min": 0,    "max": 200,  "default": 50,  "step": 1,    "display_format": "%.0f" },
@@ -79,8 +80,8 @@
         },
         "filter": {
           "label": "Filter",
-          "knobs": ["cutoff", "reso", "filter_mode", "cutoff_eg1", "cutoff_key", "route", "blend"],
-          "params": ["cutoff", "reso", "filter_mode", "cutoff_eg1", "cutoff_key"]
+          "knobs": ["cutoff", "reso", "filter_mode", "cutoff_eg1", "cutoff_key", "blend", "filt_drive"],
+          "params": ["cutoff", "reso", "filter_mode", "cutoff_eg1", "cutoff_key", "blend", "filt_drive"]
         },
         "tone": {
           "label": "Tone",

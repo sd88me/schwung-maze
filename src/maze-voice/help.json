@@ -19,11 +19,11 @@
     ] },
     { "title": "Filter", "lines": [
       "Cutoff: exp, dense low end",
-      "Resonance: filter Q",
-      "Filt Mode: LP>BP",
+      "Resonance: to near self-osc",
+      "LP-BP: filter morph",
       "Env1 Dec: mod env (exp)",
       "Cut EG1 / Cut Key",
-      "Route / Blend"
+      "Blend / Filt Drive"
     ] },
     { "title": "Tone", "lines": [
       "VCO/Mod/Noise Lvl 0-200",

@@ -4,8 +4,36 @@
  *  state-variable filter voice for Ableton Move.
  *
  *  Released from the schwung-maze repo; the repo versions every module by git
- *  tag, so module.json tracks the repo (1.2.0) rather than the 0.3.x dev line
- *  the change notes below refer to. No DSP change since v0.3.6.
+ *  tag, so module.json tracks the repo (1.3.1) rather than the 0.3.x dev line
+ *  the change notes below refer to.
+ *
+ *  v1.3.1 change — Resonance felt weak through most of the knob's travel:
+ *    a LINEAR damping taper leaves Q sitting near 1 (no audible boost)
+ *    until the last few percent of the knob. Switched to an exponential
+ *    taper (same SVF_K_MAX/SVF_K_MIN endpoints, Q now rises smoothly
+ *    across the whole range) and lowered SVF_K_MIN 0.02 -> 0.012 (Q~83 at
+ *    Resonance=100, up from ~50) for a bit more bite at the ceiling too.
+ *
+ *  v1.3.0 change — VCF rework (DSP + UI):
+ *    - svf_tick: removed the `k_nl` hack (damping that INCREASED with |ic1|,
+ *      i.e. choked resonance instead of letting it sing, and capped at
+ *      Q=12 so the filter could never reach self-oscillation). Damping is
+ *      now a function of the Resonance knob (SVF_K_MAX at Resonance=0 down
+ *      to SVF_K_MIN at 100 — near self-oscillation, per the real Labyrinth
+ *      spec; exponential taper since v1.3.1), and the two TPT integrators
+ *      saturate their own state (op-amp-headroom style) so near-zero
+ *      damping stays numerically bounded instead of blowing up.
+ *    - The LP/BP morph blend is now gain-matched (see svf_tick comment) so
+ *      sweeping Filter Mode doesn't bulge/dip mid-travel.
+ *    - Filter coefficients (cutoff + cutoff_eg1's contribution) are now
+ *      recomputed every sample inside render_block's loop instead of once
+ *      per 128-frame block, so filter-envelope sweeps no longer stair-step.
+ *    - New Filt Drive param/knob: a bypass-at-zero gain-into-tanh stage
+ *      feeding the VCF input (filt_drive_shape), regardless of ORDER
+ *      routing.
+ *    - UI: Filt Mode renamed "LP-BP". Filter page's knobs/params: ORDER
+ *      removed (now WaveFolder-page-only), Filt Drive added; Blend kept on
+ *      both pages.
  *
  *  v0.3.6 change — Randomise page, module.json only, no DSP change:
  *    rnd_voice / rnd_wavefolder / rnd_filter / rnd_tone now declare
@@ -75,6 +103,9 @@
 #define BOSS_DRIVE_MAX  6.0f       /* gain at full Tone/Sat */
 #define BOSS_MAKEUP     1.3f
 #define BOSS_TONE_HZ    3800.0f    /* Boss passive tone stage corner */
+#define FILT_DRIVE_MAX  4.0f       /* extra small-signal gain at full Filt Drive */
+#define SVF_K_MAX       2.02f      /* damping at Resonance=0 (~Butterworth) */
+#define SVF_K_MIN       0.012f     /* damping at Resonance=100 (near self-osc) */
 
 /* v0.3.2 exponential control-curve endpoints */
 #define CUT_MIN_HZ      20.0f
@@ -147,24 +178,61 @@ static inline float wavefold(float x){
     while (x < -1.0f) x = -2.0f - x;
     return fast_tanh(1.6f * x) * (1.0f / 0.9217f);
 }
+
+/* Filter Drive (v1.3.0): a gain-into-saturation stage feeding the VCF input,
+ * MS-20/Labyrinth-style. amt=0 is an exact bypass (no coloration at rest);
+ * amt=1 pushes ~4x small-signal gain through a makeup-normalised tanh, then
+ * crossfades that against the clean signal so the knob adds grit smoothly
+ * instead of stepping in. */
+static inline float filt_drive_shape(float x, float amt){
+    if (amt <= 0.0001f) return x;
+    float driveGain = 1.0f + amt * FILT_DRIVE_MAX;
+    float shaped = fast_tanh(x * driveGain) / fast_tanh(driveGain);
+    return x + amt * (shaped - x);
+}
+
+/* State-variable filter — Cytomic/Simper TPT core (unconditionally stable
+ * zero-delay-feedback form), continuously morphing lowpass -> bandpass per
+ * the real Labyrinth's Filter Mode control (no highpass tap: this filter
+ * genuinely only sweeps LP<->BP, so morph=0/1 are not placeholders).
+ *
+ * v1.3.0 rework (was: a `k_nl` term that INCREASED damping with |ic1|,
+ * i.e. choked resonance exactly when it should have been singing, capped
+ * at Q=12 so it could never reach self-oscillation, and driven from a
+ * squared Resonance taper that left the bottom half of the knob dead):
+ *   - k (damping = 1/Q) is now set directly from a linear Resonance taper,
+ *     reaching near-self-oscillation at Resonance=100 (SVF_K_MIN), matching
+ *     the Labyrinth's "resonance ... to near self-oscillation" spec.
+ *   - The two TPT integrators now saturate their OWN state (the op-amp
+ *     headroom a real analog integrator would have) instead of leaning on
+ *     an artificial level-vs-damping hack. This is what makes near-zero k
+ *     numerically safe: energy that would otherwise blow up self-limits
+ *     into a bounded, singing self-oscillation rather than a runaway.
+ *   - The LP/BP blend is gain-matched: LP's resonant peak grows toward Q
+ *     while BP's stays ~unity, so a naive crossfade bulges mid-travel. The
+ *     compensation is a no-op at morph=0 (pure LP keeps its full natural
+ *     peak — Labyrinth-faithful: Resonance must not thin the low end) and
+ *     fades to unity at morph=1 (pure BP, uncompensated). */
 typedef struct { float ic1, ic2; float g, k, morph; } svf_t;
-static inline void svf_set(svf_t* f, float fc, float Q, float morph, float fs){
+static inline void svf_set(svf_t* f, float fc, float k, float morph, float fs){
     fc = clampf(fc, 20.0f, 0.45f * fs);
     f->g = tanf(PI_F * fc / fs);
-    f->k = 1.0f / clampf(Q, 0.5f, 12.0f);
+    f->k = clampf(k, SVF_K_MIN, SVF_K_MAX);
     f->morph = morph;
 }
 static inline float svf_tick(svf_t* f, float x){
-    float k_nl = f->k * (1.0f + 0.15f * fast_tanh(fabsf(f->ic1)));
-    float a1 = 1.0f / (1.0f + f->g * (f->g + k_nl));
+    float a1 = 1.0f / (1.0f + f->g * (f->g + f->k));
     float a2 = f->g * a1;
     float a3 = f->g * a2;
     float v3 = x - f->ic2;
     float v1 = a1 * f->ic1 + a2 * v3;
     float v2 = f->ic2 + a2 * f->ic1 + a3 * v3;
-    f->ic1 = 2.0f * v1 - f->ic1;
-    f->ic2 = 2.0f * v2 - f->ic2;
-    return (1.0f - f->morph) * v2 + f->morph * v1;
+    f->ic1 = fast_tanh(2.0f * v1 - f->ic1);
+    f->ic2 = fast_tanh(2.0f * v2 - f->ic2);
+
+    float peakQ  = 1.0f / f->k;
+    float lpComp = 1.0f / (1.0f + (peakQ - 1.0f) * f->morph);
+    return (1.0f - f->morph) * v2 * lpComp + f->morph * v1;
 }
 
 /* Decay-only envelope with a 2 ms attack ramp (removes retrigger clicks). */
@@ -221,6 +289,7 @@ typedef struct {
     int   route;
     float cutoff;    /* v0.3.2: 0..1 knob (exp -> Hz) */
     float reso, filterMode, env1Decay, cutoffEg1, cutoffKey;
+    float filtDrive; /* v1.3.0: 0..1, VCF input drive */
     float vcoLvl, modLvl, noiseLvl;   /* 0..2 */
     float noiseTone;                  /* -1..1 */
     float ringLvl;                    /* 0..1 */
@@ -233,6 +302,7 @@ typedef struct {
     /* smoothed */
     float sVcoLvl, sModLvl, sNoiseLvl, sNoiseTone, sRingLvl, sSat, sLevel;
     float sBlend, sFoldBias, sFoldDrive, sFmDepth;
+    float sCutoff, sReso, sFilterMode, sFiltDrive; /* v1.3.0 */
 
     char  err[96];
 } maze_t;
@@ -330,7 +400,7 @@ static void load_defaults(maze_t* v){
     v->foldDrive=0.0f; v->foldBias=0.0f; v->route=1; v->foldEg1=0.0f; v->foldKey=0.0f; v->blend=0.0f;
     v->cutoff=1.0f;
     v->reso=0.0f; v->filterMode=0.0f; v->env1Decay=0.60f;
-    v->cutoffEg1=0.3f; v->cutoffKey=0.0f;
+    v->cutoffEg1=0.3f; v->cutoffKey=0.0f; v->filtDrive=0.0f;
     v->vcoLvl=1.0f; v->modLvl=0.5f; v->noiseLvl=0.0f; v->noiseTone=0.0f;
     v->ringLvl=0.0f; v->sat=0.0f; v->level=0.8f;
 
@@ -340,6 +410,7 @@ static void load_defaults(maze_t* v){
     v->sVcoLvl=v->vcoLvl; v->sModLvl=v->modLvl; v->sNoiseLvl=v->noiseLvl;
     v->sNoiseTone=v->noiseTone; v->sRingLvl=v->ringLvl; v->sSat=v->sat; v->sLevel=v->level;
     v->sBlend=v->blend; v->sFoldBias=v->foldBias; v->sFoldDrive=v->foldDrive; v->sFmDepth=v->fmDepth;
+    v->sCutoff=v->cutoff; v->sReso=v->reso; v->sFilterMode=v->filterMode; v->sFiltDrive=v->filtDrive;
 
     v->bossToneA = 1.0f - expf(-TWO_PI * BOSS_TONE_HZ / v->fsInternal);
 
@@ -367,6 +438,7 @@ static void randomize_page(maze_t* v, int page){
         v->cutoff = rr(0.3f,1.0f); v->reso = rr(0,0.7f); v->filterMode = rr(0,1);
         v->env1Decay = rr(0.3f,0.85f); env_set(&v->eg1, decay_sec(v->env1Decay), SAMPLE_RATE);
         v->cutoffEg1 = rr(-0.6f,0.8f); v->cutoffKey = rr(0,0.5f);
+        v->filtDrive = rr(0,0.4f);
         break;
     case 3:
         v->vcoLvl = rr(0.6f,1.6f); v->modLvl = rr(0,1.2f); v->noiseLvl = rr(0,0.6f);
@@ -477,6 +549,7 @@ static void set_param(void* instance, const char* key, const char* val){
     else if (!strcmp(key,"env1_decay")){v->env1Decay=f/100.0f; env_set(&v->eg1,decay_sec(v->env1Decay),SAMPLE_RATE); }
     else if (!strcmp(key,"cutoff_eg1")) v->cutoffEg1= f/100.0f;
     else if (!strcmp(key,"cutoff_key")) v->cutoffKey= f/100.0f;
+    else if (!strcmp(key,"filt_drive")) v->filtDrive= f/100.0f;
     else if (!strcmp(key,"vco_lvl"))    v->vcoLvl   = f/100.0f;
     else if (!strcmp(key,"mod_lvl"))    v->modLvl   = f/100.0f;
     else if (!strcmp(key,"noise_lvl"))  v->noiseLvl = f/100.0f;
@@ -491,13 +564,13 @@ static int build_state(maze_t* v, char* buf, int len){
     return snprintf(buf, (size_t)len,
       "vco_tune=%.4g,mod_freq=%.4g,fm_depth=%.4g,fm_eg1=%.4g,vco_eg1=%.4g,mod_eg1=%.4g,env2_decay=%.4g,"
       "fold_drive=%.4g,fold_bias=%.4g,route=%d,fold_eg1=%.4g,fold_key=%.4g,blend=%.4g,"
-      "cutoff=%.4g,reso=%.4g,filter_mode=%.4g,env1_decay=%.4g,cutoff_eg1=%.4g,cutoff_key=%.4g,"
+      "cutoff=%.4g,reso=%.4g,filter_mode=%.4g,env1_decay=%.4g,cutoff_eg1=%.4g,cutoff_key=%.4g,filt_drive=%.4g,"
       "vco_lvl=%.4g,mod_lvl=%.4g,noise_lvl=%.4g,noise_tone=%.4g,ring_lvl=%.4g,sat=%.4g,level=%.4g,"
       "vco_key=%.4g,mod_key=%.4g,"
       "rnd_voice=%d,rnd_wavefolder=%d,rnd_filter=%d,rnd_tone=%d",
       v->vcoTune, v->modFreq, v->fmDepth*100, v->fmEg1*100, v->vcoEg1*100, v->modEg1*100, v->env2Decay*100,
       v->foldDrive*100, v->foldBias*100, v->route, v->foldEg1*100, v->foldKey*100, v->blend*100,
-      v->cutoff*100, v->reso*100, v->filterMode*100, v->env1Decay*100, v->cutoffEg1*100, v->cutoffKey*100,
+      v->cutoff*100, v->reso*100, v->filterMode*100, v->env1Decay*100, v->cutoffEg1*100, v->cutoffKey*100, v->filtDrive*100,
       v->vcoLvl*100, v->modLvl*100, v->noiseLvl*100, v->noiseTone*100, v->ringLvl*100, v->sat*100, v->level*100,
       v->vcoKey*100, v->modKey*100,
       v->rndVoice, v->rndWavefolder, v->rndFilter, v->rndTone);
@@ -548,6 +621,7 @@ static int get_param(void* instance, const char* key, char* buf, int buf_len){
     else if (!strcmp(key,"env1_decay")) f = v->env1Decay*100.0f;
     else if (!strcmp(key,"cutoff_eg1")) f = v->cutoffEg1*100.0f;
     else if (!strcmp(key,"cutoff_key")) f = v->cutoffKey*100.0f;
+    else if (!strcmp(key,"filt_drive")) f = v->filtDrive*100.0f;
     else if (!strcmp(key,"vco_lvl"))    f = v->vcoLvl*100.0f;
     else if (!strcmp(key,"mod_lvl"))    f = v->modLvl*100.0f;
     else if (!strcmp(key,"noise_lvl"))  f = v->noiseLvl*100.0f;
@@ -575,6 +649,7 @@ typedef struct {
     float gVco, gMod, gRing, gNoise;
     float satAmt;
     float foldBias, blend, amp, level;
+    float filtDrive;
     int   route;
 } ctrl_t;
 
@@ -612,12 +687,12 @@ static inline float voice_tick(maze_t* v, const ctrl_t* c, float foldGain){
     float folded, filtered;
     if (c->route == 1){
         folded   = wavefold(foldGain * core + c->foldBias);
-        filtered = svf_tick(&v->svf, core);
+        filtered = svf_tick(&v->svf, filt_drive_shape(core, c->filtDrive));
     } else if (c->route == 0){
         folded   = wavefold(foldGain * core + c->foldBias);
-        filtered = svf_tick(&v->svf, folded);
+        filtered = svf_tick(&v->svf, filt_drive_shape(folded, c->filtDrive));
     } else {
-        filtered = svf_tick(&v->svf, core);
+        filtered = svf_tick(&v->svf, filt_drive_shape(core, c->filtDrive));
         folded   = wavefold(foldGain * filtered + c->foldBias);
     }
     folded = dcblock(&v->dcFold, folded);
@@ -663,8 +738,12 @@ static void render_block(void* instance, int16_t* out_lr, int frames){
     v->sFoldBias = smooth1(v->sFoldBias,v->foldBias,sc);
     v->sFoldDrive= smooth1(v->sFoldDrive,v->foldDrive,sc);
     v->sFmDepth  = smooth1(v->sFmDepth, v->fmDepth, sc);
+    v->sCutoff   = smooth1(v->sCutoff,  v->cutoff,  sc);
+    v->sReso     = smooth1(v->sReso,    v->reso,    sc);
+    v->sFilterMode=smooth1(v->sFilterMode,v->filterMode,sc);
+    v->sFiltDrive= smooth1(v->sFiltDrive,v->filtDrive,sc);
 
-    float eg1b = v->eg1.level;
+    float eg1b = v->eg1.level;   /* block-start EG1: VCO/Mod pitch EG only (unchanged) */
 
     float vcoBaseMidi = 69.0f + v->vcoKey * (v->note - 69.0f);
     float vcoSemis = v->vcoTune + v->vcoEg1 * eg1b * EG_PITCH_SEMIS;
@@ -676,12 +755,18 @@ static void render_block(void* instance, int16_t* out_lr, int frames){
     float fMod = v->modFreq * powf(2.0f, (modSemis + dCM/100.0f)/12.0f);
     fMod = clampf(fMod, 0.05f, 0.45f*v->fsInternal);
 
+    /* Cutoff key-tracking is note-constant for the block; cutoff_eg1's
+     * contribution is applied per-sample below from the live EG1 (v1.3.0)
+     * instead of the block-start eg1b, so filter-envelope sweeps don't
+     * stair-step at the 128-frame block rate. */
     float cutKeyOff = v->note - 60.0f;
-    float cutSemis = v->cutoffKey * cutKeyOff;
-    float cutEnv   = v->cutoffEg1 * eg1b * EG_CUT_OCT;
-    float cutHz = cutoff_hz(v->cutoff) * powf(2.0f, cutSemis/12.0f) * powf(2.0f, cutEnv);
-    float Q = 0.5f + v->reso * v->reso * 11.5f;
-    svf_set(&v->svf, cutHz, Q, v->filterMode, v->fsInternal);
+    float cutBaseSemis = v->cutoffKey * cutKeyOff;
+    /* Exponential taper (was linear): a linear k sweep leaves Q sitting
+     * near 1 (no audible boost) through most of the knob's travel and
+     * only opens up in the last few percent. Q = 1/k rising exponentially
+     * with the knob gives a resonance that's actually felt across the
+     * range, not just right at the top. */
+    float kDamp = SVF_K_MAX * powf(SVF_K_MIN / SVF_K_MAX, v->sReso);
 
     ctrl_t c;
     c.f1 = f1; c.fMod = fMod;
@@ -694,6 +779,7 @@ static void render_block(void* instance, int16_t* out_lr, int frames){
     c.foldBias = v->sFoldBias;
     c.blend = v->sBlend;
     c.level = v->sLevel;
+    c.filtDrive = v->sFiltDrive;
     c.route = v->route;
 
     float foldKeyTerm = v->foldKey * ((v->note - 60.0f) / 24.0f);
@@ -702,6 +788,10 @@ static void render_block(void* instance, int16_t* out_lr, int frames){
         float e1 = env_run(&v->eg1);
         float e2 = env_run(&v->eg2);
         c.amp = e2 * v->vel;
+
+        float cutEnv = v->cutoffEg1 * e1 * EG_CUT_OCT;
+        float cutHz  = cutoff_hz(v->sCutoff) * powf(2.0f, cutBaseSemis/12.0f) * powf(2.0f, cutEnv);
+        svf_set(&v->svf, cutHz, kDamp, v->sFilterMode, v->fsInternal);
 
         float foldAmt = clampf(v->sFoldDrive + v->foldEg1 * e1 + foldKeyTerm, 0.0f, 1.0f);
         float foldGain = 1.0f + foldAmt * 7.0f;

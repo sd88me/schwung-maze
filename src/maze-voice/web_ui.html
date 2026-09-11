@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Maze Voice</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --cheek: #0c0b0a; --cheek-hi: #201d19; --cheek-edge: #000;
+    --plate: #131211; --plate-hi: #1c1a17; --plate-shadow: #060605;
+    --plate-line: rgba(255, 255, 255, 0.09); --plate-line-strong: rgba(255, 255, 255, 0.18);
+    --ink: #efe9d8; --ink-dim: #8f8878; --ink-faint: #5c584c;
+    --metal-hi: #f2f1ee; --metal-lo: #8f8e89;
+    --accent: #c1552f; --led-off: #2c2620; --led-on: #e2793f;
+    --bg: #0a0a08;
+  }
+
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); }
+  body { font-family: "Archivo", ui-sans-serif, system-ui, sans-serif; padding: 10px; overflow-x: auto; color: var(--ink); }
+
+  /* ---- top bar ---- */
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 6px 10px 10px; }
+  .topbar .name { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 0.04em; color: var(--ink); }
+  .topbar .status { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); display: flex; align-items: center; gap: 6px; }
+  .topbar .status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--led-off); }
+  .topbar .status.live .dot { background: var(--led-on); box-shadow: 0 0 5px var(--led-on); }
+  .sync-btn { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); background: #1c1a17; border: 1px solid var(--plate-line); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+  .sync-btn:active { background: #26231e; }
+
+  /* ------------------------------------------------------------------ */
+  /* Rack                                                                 */
+  /* ------------------------------------------------------------------ */
+  .rack { display: grid; grid-template-columns: 20px 1fr 20px; width: fit-content; border-radius: 8px; overflow: hidden; box-shadow: 0 20px 44px -22px rgba(0,0,0,0.6), 0 2px 0 rgba(0,0,0,0.3); }
+  .cheek { background: linear-gradient(180deg, var(--cheek-hi), var(--cheek) 45%, var(--cheek-edge)); position: relative; }
+  .cheek::before, .cheek::after { content: ""; position: absolute; left: 50%; width: 6px; height: 6px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #5a5650, #100e0b 70%); transform: translateX(-50%); }
+  .cheek::before { top: 14px; } .cheek::after { bottom: 14px; }
+
+  .plate { background: repeating-linear-gradient(115deg, rgba(255,255,255,0.014) 0 1px, transparent 1px 3px), linear-gradient(150deg, var(--plate-hi), var(--plate) 45%, var(--plate-shadow)); padding: 20px 22px 0; position: relative; color: var(--ink); }
+  .screw { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #8b8578, #423e35 60%, #1c1a16 100%); box-shadow: 0 1px 2px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.4); }
+  .screw::before, .screw::after { content: ""; position: absolute; top: 50%; left: 50%; background: #17150f; transform: translate(-50%, -50%) rotate(45deg); }
+  .screw::before { width: 6.5px; height: 1.3px; } .screw::after { width: 1.3px; height: 6.5px; }
+  .screw.tl { top: 9px; left: 9px; } .screw.tr { top: 9px; right: 9px; }
+  .screw.bl { bottom: 44px; left: 9px; } .screw.br { bottom: 44px; right: 9px; }
+
+  .panel-rows { display: flex; align-items: stretch; gap: 0; padding-block: 4px 10px; }
+  .section { display: flex; flex-direction: column; gap: 8px; padding-inline: 14px; border-left: 1px solid var(--plate-line); }
+  .section:first-child { border-left: none; padding-left: 2px; }
+  .section-title { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); border-bottom: 1px solid var(--plate-line-strong); padding-bottom: 5px; }
+
+  .stack { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .stack-row { display: flex; gap: 12px; align-items: flex-start; flex: 1; }
+  .stack-row.mid { flex: 0 0 auto; gap: 16px; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .col.spacer-col { visibility: hidden; }
+  /* Every knob column — whatever its size — reserves the same stage height
+     (so big/small/tiny knobs share one visual centerline across a row) and
+     the same topline height (whether it holds endcaps, polarity marks, or
+     nothing), so the value/caption text lands on one shared baseline too. */
+  .stage { height: 56px; display: flex; align-items: center; justify-content: center; }
+  .topline { height: 10px; width: 34px; display: flex; align-items: center; justify-content: center; }
+  .topline.endcaps, .topline.polarity { justify-content: space-between; }
+  .topline.endcaps { font-size: 8.5px; color: var(--ink-dim); font-family: "Barlow Condensed", sans-serif; font-weight: 700; letter-spacing: 0.06em; }
+  .topline.polarity { font-size: 8px; color: var(--ink-faint); }
+
+  .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+
+  /* ---- Env / Output: one column, split top/bottom in half ---- */
+  .section.output { flex: 0 0 auto; gap: 0; }
+  .half { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+  .half + .half { border-top: 1px dashed var(--plate-line); }
+  .half-title { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+  .half-row { display: flex; gap: 14px; }
+
+  /* ---- captions ---- */
+  .cap-label { font-family: "Barlow Condensed", sans-serif; font-weight: 600; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; text-align: center; color: var(--ink); line-height: 1.15; white-space: nowrap; }
+  .cap-label.extra { color: var(--ink-dim); font-weight: 600; }
+  .kval { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 8.5px; color: var(--ink-faint); height: 10px; line-height: 10px; font-variant-numeric: tabular-nums; }
+
+  /* ---- knob: generated SVG, fluted skirt + brushed-metal cap ---- */
+  .knob-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .knob-wrap.tiny .knob-svg { width: 25px; height: 25px; }
+  .knob-wrap.small .knob-svg { width: 33px; height: 33px; }
+  .knob-wrap.big .knob-svg { width: 52px; height: 52px; }
+  .knob-svg { cursor: ns-resize; touch-action: none; overflow: visible; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+
+  /* ---- Order: a real 3-position switch, not a knob ---- */
+  .order-wrap { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .order-track { display: flex; gap: 2px; background: #050403; border-radius: 4px; padding: 3px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.7), 0 0 0 1px var(--plate-line); }
+  .order-seg { width: 16px; height: 22px; border-radius: 2px; cursor: pointer; background: #1c1a17; display: flex; align-items: center; justify-content: center; }
+  .order-seg svg { width: 9px; height: 9px; opacity: 0.55; }
+  .order-seg.active { background: linear-gradient(155deg, var(--metal-hi), var(--metal-lo)); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.3); }
+  .order-seg.active svg { opacity: 1; }
+  .order-seg:not(.active) svg { filter: invert(1); }
+
+  /* ------------------------------------------------------------------ */
+  /* Bottom strip — Randomise                                            */
+  /* ------------------------------------------------------------------ */
+  .rnd-strip { display: flex; align-items: center; gap: 22px; padding: 10px 6px 12px; margin-top: 6px; border-top: 1px solid var(--plate-line); }
+  .rnd-strip .strip-title { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); white-space: nowrap; }
+  .rnd-toggles { display: flex; gap: 16px; }
+  .rnd-block { display: flex; align-items: center; gap: 6px; }
+  .toggle { width: 30px; height: 17px; border-radius: 9px; cursor: pointer; position: relative; background: #050403; box-shadow: inset 0 1px 3px rgba(0,0,0,0.7), 0 0 0 1px var(--plate-line); flex: none; }
+  .toggle .knob-led { position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: linear-gradient(180deg, #4c473d, #201e19); transition: left .12s ease, background .12s ease; }
+  .toggle.on .knob-led { left: 15px; background: linear-gradient(180deg, var(--led-on), #a1451c); }
+  .rnd-block .cap-label { font-size: 9px; }
+  .gen-btn { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #fdf3ea; background: linear-gradient(180deg, var(--accent), #7f2f1e); border: none; border-radius: 4px; padding: 6px 14px; cursor: pointer; box-shadow: 0 2px 0 #5c2114, 0 3px 6px rgba(0,0,0,0.5); }
+  .gen-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #5c2114, 0 2px 3px rgba(0,0,0,0.5); }
+
+  .plate-foot { display: flex; align-items: baseline; justify-content: center; gap: 10px; padding: 10px 0 12px; }
+  .wordmark { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.04em; color: var(--ink); }
+  .tagline { font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="name">MAZE VOICE</span>
+  <span class="status" id="status"><span class="dot"></span><span id="statusText">Connecting&hellip;</span></span>
+  <button class="sync-btn" id="sync" title="Force a full re-sync from the device">&#8635; Sync</button>
+</div>
+
+<div class="rack" aria-label="Maze Voice control panel">
+  <div class="cheek" aria-hidden="true"></div>
+  <div class="plate">
+    <span class="screw tl" aria-hidden="true"></span><span class="screw tr" aria-hidden="true"></span>
+    <span class="screw bl" aria-hidden="true"></span><span class="screw br" aria-hidden="true"></span>
+    <div class="panel-rows" id="panelRows"></div>
+    <div class="rnd-strip" id="rndStrip"></div>
+    <div class="plate-foot"><span class="wordmark">MAZE VOICE</span><span class="tagline">Thru&#8209;zero Voice &middot; for Move</span></div>
+  </div>
+  <div class="cheek" aria-hidden="true"></div>
+</div>
+
+<script src="/static/schwung-remote-api.js"></script>
+<script>
+"use strict";
+
+/* fallback so the page still renders for local preview outside the manager */
+if (!window.schwungRemote) {
+  const _store = {};
+  window.schwungRemote = {
+    getParam: (k) => Promise.resolve(_store[k]),
+    setParam: (k, v) => { _store[k] = String(v); },
+    onParamChange: () => {},
+    getHierarchy: () => Promise.resolve(null),
+    getChainParams: () => Promise.resolve(null),
+  };
+}
+
+const P = "synth:"; /* component prefix for all maze-voice params */
+const SVG_NS = "http://www.w3.org/2000/svg";
+let uid = 0;
+
+function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
+/* ---------------------------------------------------------------------
+ * Wire-value math — this is the part that has to match dsp/maze_voice.c's
+ * set_param/get_param exactly:
+ *   - most params: plain display units, as declared in module.json's
+ *     chain_params (percent 0..100, bipolar -100..100, 0..200, semitones,
+ *     or raw Hz) — the DSP itself does any internal curve (e.g. Cutoff's
+ *     0..100 becomes 20Hz..20kHz inside cutoff_hz(), so the wire value
+ *     for Cutoff stays a plain linear 0..100).
+ *   - Mod Freq (0.2..1300 Hz) has NO such DSP-side curve, so a log
+ *     mapping is applied here at the UI layer (module.json's "curve":
+ *     "log" is exactly this — normally a generic host knob would apply
+ *     it; we're the knob here, so we do it ourselves).
+ *   - Order is an enum: the wire value is the numeric index (0/1/2),
+ *     never the option text.
+ * ------------------------------------------------------------------- */
+function wireRaw(item, frac) {
+  if (item.curve === "log") return item.min * Math.pow(item.max / item.min, frac);
+  return item.min + frac * (item.max - item.min);
+}
+function fracFromWire(item, raw) {
+  if (item.curve === "log") return Math.log(raw / item.min) / Math.log(item.max / item.min);
+  return (raw - item.min) / (item.max - item.min);
+}
+function quantize(item, raw) {
+  const step = item.step || 1;
+  return Math.round(raw / step) * step;
+}
+function fmtValue(item, frac) {
+  const raw = wireRaw(item, frac);
+  if (item.curve === "cutoff-display") { const hz = 20 * Math.pow(1000, frac); return (hz >= 1000 ? (hz/1000).toFixed(2)+"k" : Math.round(hz)) + "Hz"; }
+  if (item.curve === "log") return (raw >= 1000 ? (raw/1000).toFixed(2)+"k" : raw.toFixed(raw < 10 ? 1 : 0)) + "Hz";
+  if (item.unit === "st") return (raw >= 0 ? "+" : "") + Math.round(raw) + "st";
+  if (item.foot) return raw >= 0 ? Math.round(raw) + "%→" + item.foot[1] : Math.round(-raw) + "%→" + item.foot[0];
+  if (item.bipolar) return (raw >= 0 ? "+" : "") + Math.round(raw);
+  return Math.round(raw) + (item.unit && item.unit !== "Hz" ? item.unit : "");
+}
+
+const registry = {}; /* key -> { set(rawStr) } — used for seed + live sync */
+
+/* ---------------------------------------------------------------------
+ * SVG knob: an 8-flute scalloped skirt (sampled, not hand-authored path
+ * data) + a brushed-metal cap + a dark pointer tab, all rotating as one
+ * piece — a real knob rotates its whole body, flutes included.
+ * ------------------------------------------------------------------- */
+function scallopPoints(cx, cy, rBase, rAmp, n, samples) {
+  const pts = [];
+  for (let i = 0; i <= samples; i++) {
+    const t = (i / samples) * Math.PI * 2;
+    const r = rBase + rAmp * Math.cos(n * t);
+    pts.push((cx + r * Math.cos(t)).toFixed(2) + "," + (cy + r * Math.sin(t)).toFixed(2));
+  }
+  return pts.join(" ");
+}
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+function buildKnobSvg() {
+  const id = "kg" + (uid++);
+  const svg = svgEl("svg", { viewBox: "0 0 100 100", class: "knob-svg" });
+  const defs = svgEl("defs", {});
+  defs.innerHTML =
+    '<radialGradient id="' + id + '-skirt" cx="36%" cy="28%" r="80%">' +
+      '<stop offset="0%" stop-color="#4c4842"/><stop offset="55%" stop-color="#201e1a"/><stop offset="100%" stop-color="#030302"/>' +
+    '</radialGradient>' +
+    '<linearGradient id="' + id + '-cap" x1="12%" y1="8%" x2="88%" y2="92%">' +
+      '<stop offset="0%" stop-color="#f4f3f0"/><stop offset="42%" stop-color="#aeada8"/><stop offset="52%" stop-color="#96958f"/><stop offset="100%" stop-color="#e2e0da"/>' +
+    '</linearGradient>';
+  svg.appendChild(defs);
+
+  const rotor = svgEl("g", { class: "rotor" });
+  rotor.appendChild(svgEl("polygon", { points: scallopPoints(50, 50, 40, 7, 8, 96), fill: "url(#" + id + "-skirt)", stroke: "#000", "stroke-width": "0.6" }));
+  rotor.appendChild(svgEl("circle", { cx: "50", cy: "50", r: "29", fill: "url(#" + id + "-cap)", stroke: "#75746e", "stroke-width": "0.6" }));
+  rotor.appendChild(svgEl("rect", { x: "47.2", y: "23", width: "5.6", height: "14", rx: "1.6", fill: "#201f1c" }));
+  svg.appendChild(rotor);
+  return { svg, rotor };
+}
+
+function makeKnob(item, sizeOverride) {
+  const wrap = document.createElement("div");
+  wrap.className = "knob-wrap " + (sizeOverride || item.size || "small");
+  const { svg, rotor } = buildKnobSvg();
+  const stage = document.createElement("div"); stage.className = "stage"; stage.appendChild(svg);
+
+  const val = document.createElement("div"); val.className = "kval";
+  const cap = document.createElement("div"); cap.className = "cap-label" + (item.extra ? " extra" : "");
+  cap.textContent = item.cap;
+
+  const topline = document.createElement("div"); topline.className = "topline";
+  if (item.foot) { topline.classList.add("endcaps"); topline.innerHTML = "<span>" + item.foot[0] + "</span><span>" + item.foot[1] + "</span>"; }
+  else if (item.bipolar) { topline.classList.add("polarity"); topline.innerHTML = "<span>&minus;</span><span>+</span>"; }
+
+  wrap.appendChild(stage);
+  wrap.appendChild(topline);
+  wrap.appendChild(val); wrap.appendChild(cap);
+
+  let cur = fracFromWire(item, item.def);
+  /* visual only — used both for user drags and for applying device updates */
+  function render(frac) { cur = clamp01(frac); rotor.setAttribute("transform", "rotate(" + (-132 + cur * 264) + " 50 50)"); val.textContent = fmtValue(item, cur); }
+  /* visual + send to device */
+  function commit(frac) { render(frac); schwungRemote.setParam(P + item.key, String(quantize(item, wireRaw(item, cur)))); }
+
+  let dragging = false, startY = 0, startV = 0;
+  function down(e) { dragging = true; startY = (e.touches ? e.touches[0].clientY : e.clientY); startV = cur; e.preventDefault();
+    window.addEventListener("mousemove", move); window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("mouseup", up); window.addEventListener("touchend", up); }
+  function move(e) { if (!dragging) return; const y = (e.touches ? e.touches[0].clientY : e.clientY); const speed = e.shiftKey ? 640 : 180;
+    commit(startV + (startY - y) / speed); e.preventDefault(); }
+  function up() { dragging = false; window.removeEventListener("mousemove", move); window.removeEventListener("touchmove", move);
+    window.removeEventListener("mouseup", up); window.removeEventListener("touchend", up); }
+  svg.addEventListener("mousedown", down);
+  svg.addEventListener("touchstart", down, { passive: false });
+  svg.addEventListener("wheel", (e) => { commit(cur - Math.sign(e.deltaY) * 0.02); e.preventDefault(); }, { passive: false });
+  svg.addEventListener("dblclick", () => commit(fracFromWire(item, item.def)));
+
+  render(cur);
+  /* Ignore live pushes while the user is actively dragging this knob — see
+   * maze_seq/web_ui.html for why (server pushes can land mid-gesture with
+   * the pre-drag value and visibly snap the knob back otherwise). */
+  if (!item.noRegister) registry[item.key] = { set: (v) => { if (dragging) return; const raw = parseFloat(v); if (!isNaN(raw)) render(clamp01(fracFromWire(item, raw))); } };
+  return wrap;
+}
+
+/* ---------------------------------------------------------------------
+ * Order — a real 3-position switch (segmented, not a rotary control).
+ * Wire value is the numeric index (0/1/2), matching route's set_param.
+ * ------------------------------------------------------------------- */
+const ORDER_OPTIONS = ["VCW›VCF", "Parallel", "VCF›VCW"];
+const ORDER_ICONS = [
+  '<svg viewBox="0 0 20 20"><path d="M2 6h11M9 2l4 4-4 4" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 14h11" stroke="#000" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  '<svg viewBox="0 0 20 20"><circle cx="6" cy="6" r="2.6" fill="#000"/><circle cx="6" cy="14" r="2.6" fill="#000"/><path d="M10 6h8M10 14h8" stroke="#000" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  '<svg viewBox="0 0 20 20"><path d="M18 6H7M11 2L7 6l4 4" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 14H7" stroke="#000" stroke-width="2.4" stroke-linecap="round"/></svg>',
+];
+function makeOrderSwitch() {
+  const wrap = document.createElement("div"); wrap.className = "order-wrap";
+  const stage = document.createElement("div"); stage.className = "stage";
+  const track = document.createElement("div"); track.className = "order-track";
+  stage.appendChild(track);
+  const topline = document.createElement("div"); topline.className = "topline";
+  const val = document.createElement("div"); val.className = "kval";
+  const segs = ORDER_OPTIONS.map((label, i) => {
+    const seg = document.createElement("div"); seg.className = "order-seg"; seg.title = label; seg.innerHTML = ORDER_ICONS[i];
+    seg.addEventListener("click", () => commit(i));
+    track.appendChild(seg);
+    return seg;
+  });
+  const cap = document.createElement("div"); cap.className = "cap-label"; cap.textContent = "Order";
+
+  let idx = 1;
+  function render(i) { idx = i; segs.forEach((s, j) => s.classList.toggle("active", j === i)); val.textContent = ORDER_OPTIONS[i]; }
+  function commit(i) { render(i); schwungRemote.setParam(P + "route", String(i)); }
+  render(idx);
+
+  registry["route"] = { set: (v) => { const i = Math.round(parseFloat(v)); if (i >= 0 && i <= 2) render(i); } };
+
+  wrap.appendChild(stage); wrap.appendChild(topline); wrap.appendChild(val); wrap.appendChild(cap);
+  return wrap;
+}
+
+function makeToggle(item) {
+  const wrap = document.createElement("div"); wrap.className = "rnd-block";
+  const t = document.createElement("div"); t.className = "toggle";
+  const led = document.createElement("div"); led.className = "knob-led"; t.appendChild(led);
+  const cap = document.createElement("div"); cap.className = "cap-label"; cap.textContent = item.cap;
+  let on = !!item.def; /* render the declared default immediately, not a false flash before seed() lands */
+  function render(v) { on = v; t.classList.toggle("on", on); }
+  render(on);
+  t.addEventListener("click", () => { render(!on); schwungRemote.setParam(P + item.key, on ? "1" : "0"); });
+  wrap.appendChild(t); wrap.appendChild(cap);
+  registry[item.key] = { set: (v) => render(parseFloat(v) >= 0.5) };
+  return wrap;
+}
+
+/* ---------------------------------------------------------------------
+ * Layout helpers
+ * ------------------------------------------------------------------- */
+function col(children, extraClass) { const c = document.createElement("div"); c.className = "col" + (extraClass ? " " + extraClass : ""); children.forEach((el) => c.appendChild(el)); return c; }
+/* An invisible copy of the knob it's standing in for, so the column takes
+ * the same width (driven by the caption text) and the row above/below
+ * still lines up — a truly empty div collapses to zero width instead. */
+function spacerCol(likeItem) { return col([ makeKnob(Object.assign({ noRegister: true }, likeItem)) ], "spacer-col"); }
+function row(cls) { const r = document.createElement("div"); r.className = "stack-row " + (cls || ""); return r; }
+function buildSection(title, className, rowBuilder) {
+  const s = document.createElement("div"); s.className = "section" + (className ? " " + className : "");
+  const t = document.createElement("div"); t.className = "section-title"; t.textContent = title; s.appendChild(t);
+  const stack = document.createElement("div"); stack.className = "stack";
+  rowBuilder(stack);
+  s.appendChild(stack);
+  return s;
+}
+
+const panelRows = document.getElementById("panelRows");
+
+/* ---- Oscillators: VCO row over Mod VCO row ---- */
+panelRows.appendChild(buildSection("Oscillators", null, (stack) => {
+  const top = row("top"), bot = row(), mid = row("mid");
+  top.appendChild(col([ makeKnob({ size:"big", key:"vco_tune", cap:"VCO Tune", unit:"st", min:-24, max:24, def:0 }) ]));
+  top.appendChild(col([ makeKnob({ size:"small", key:"vco_eg1", cap:"EG1 Amt", bipolar:true, min:-100, max:100, def:0 }) ]));
+  top.appendChild(col([ makeKnob({ size:"tiny", extra:true, key:"vco_key", cap:"VCO Key", min:0, max:100, def:100 }) ]));
+  bot.appendChild(col([ makeKnob({ size:"big", key:"mod_freq", cap:"Mod VCO Freq", unit:"Hz", min:0.2, max:1300, def:55, step:0.5, curve:"log" }) ]));
+  bot.appendChild(col([ makeKnob({ size:"small", key:"mod_eg1", cap:"EG1 Amt", bipolar:true, min:-100, max:100, def:0 }) ]));
+  bot.appendChild(col([ makeKnob({ size:"tiny", extra:true, key:"mod_key", cap:"Mod Key", min:0, max:100, def:100 }) ]));
+  mid.appendChild(col([ makeKnob({ size:"small", key:"fm_depth", cap:"Mod→VCO FM", min:0, max:100, def:0 }) ]));
+  mid.appendChild(col([ makeKnob({ size:"tiny", extra:true, key:"fm_eg1", cap:"FM EG1", bipolar:true, min:-100, max:100, def:0 }) ]));
+  stack.appendChild(top);
+  stack.appendChild(mid);
+  stack.appendChild(bot);
+}));
+
+/* ---- Mixer: its own section ---- */
+panelRows.appendChild(buildSection("Mixer", null, (stack) => {
+  const grid = document.createElement("div"); grid.className = "mini-grid";
+  [
+    { key:"vco_lvl", cap:"VCO Lvl", min:0, max:200, def:100 },
+    { key:"noise_lvl", cap:"Noise Lvl", min:0, max:200, def:0 },
+    { key:"ring_lvl", cap:"Ring Lvl", min:0, max:100, def:0 },
+    { key:"noise_tone", cap:"Noise Tone", bipolar:true, min:-100, max:100, def:0 },
+    { key:"mod_lvl", cap:"Mod VCO Lvl", min:0, max:200, def:50 },
+  ].forEach((it) => grid.appendChild(makeKnob(Object.assign({ size:"small" }, it))));
+  const wrap = document.createElement("div"); wrap.style.cssText = "display:flex;align-items:center;flex:1;";
+  wrap.appendChild(grid);
+  stack.appendChild(wrap);
+}));
+
+/* ---- Wavefolder over Filter, Order+Blend in the row between them ---- */
+panelRows.appendChild(buildSection("Wavefolder → Filter", null, (stack) => {
+  const top = row("top"), bot = row(), mid = row("mid");
+
+  top.appendChild(col([ makeKnob({ size:"big", key:"fold_drive", cap:"VCW Fold", min:0, max:100, def:0 }) ]));
+  bot.appendChild(col([ makeKnob({ size:"big", key:"cutoff", cap:"VCF Cutoff", min:0, max:100, def:100, curve:"cutoff-display" }) ]));
+
+  top.appendChild(col([ makeKnob({ size:"big", key:"fold_bias", cap:"VCW Bias", bipolar:true, min:-100, max:100, def:0 }) ]));
+  bot.appendChild(col([ makeKnob({ size:"big", key:"reso", cap:"Resonance", min:0, max:100, def:0 }) ]));
+
+  top.appendChild(spacerCol({ size:"small", key:"filt_drive_spacer", cap:"Filt Drive", min:0, max:100, def:0 }));
+  bot.appendChild(col([ makeKnob({ size:"small", extra:true, key:"filt_drive", cap:"Filt Drive", min:0, max:100, def:0 }) ]));
+
+  top.appendChild(spacerCol({ size:"big", key:"filter_mode_spacer", cap:"Filter Mode", min:0, max:100, def:0 }));
+  bot.appendChild(col([ makeKnob({ size:"big", key:"filter_mode", cap:"Filter Mode", min:0, max:100, def:0, foot:["LP","BP"] }) ]));
+
+  top.appendChild(col([ makeKnob({ size:"small", key:"fold_eg1", cap:"EG1/CV Amt", bipolar:true, min:-100, max:100, def:0 }) ]));
+  bot.appendChild(col([ makeKnob({ size:"small", key:"cutoff_eg1", cap:"EG1/CV Amt", bipolar:true, min:-100, max:100, def:30 }) ]));
+
+  top.appendChild(col([ makeKnob({ size:"tiny", extra:true, key:"fold_key", cap:"Fold Key", min:0, max:100, def:0 }) ]));
+  bot.appendChild(col([ makeKnob({ size:"tiny", extra:true, key:"cutoff_key", cap:"Cut Key", min:0, max:100, def:0 }) ]));
+
+  mid.appendChild(col([ makeOrderSwitch() ]));
+  mid.appendChild(col([ makeKnob({ size:"big", key:"blend", cap:"Blend", bipolar:true, min:-100, max:100, def:0, foot:["Fold","Filter"] }) ]));
+
+  stack.appendChild(top);
+  stack.appendChild(mid);
+  stack.appendChild(bot);
+}));
+
+/* ---- Env / Output: one narrow column, split top/bottom in half ---- */
+const outSection = document.createElement("div"); outSection.className = "section output";
+const envHalf = document.createElement("div"); envHalf.className = "half";
+const envTitle = document.createElement("div"); envTitle.className = "half-title"; envTitle.textContent = "Env";
+const envRow = document.createElement("div"); envRow.className = "half-row";
+envRow.appendChild(col([ makeKnob({ size:"small", key:"env1_decay", cap:"EG1 Decay", min:0, max:100, def:60 }) ]));
+envRow.appendChild(col([ makeKnob({ size:"small", key:"env2_decay", cap:"EG2 (VCA) Decay", min:0, max:100, def:70 }) ]));
+envHalf.appendChild(envTitle); envHalf.appendChild(envRow);
+
+const outHalf = document.createElement("div"); outHalf.className = "half";
+const outTitle = document.createElement("div"); outTitle.className = "half-title"; outTitle.textContent = "Output";
+const outRow = document.createElement("div"); outRow.className = "half-row";
+outRow.appendChild(col([ makeKnob({ size:"small", extra:true, key:"sat", cap:"Tone/Sat", min:0, max:100, def:0 }) ]));
+outRow.appendChild(col([ makeKnob({ size:"big", key:"level", cap:"Volume", min:0, max:100, def:80 }) ]));
+outHalf.appendChild(outTitle); outHalf.appendChild(outRow);
+
+outSection.appendChild(envHalf);
+outSection.appendChild(outHalf);
+panelRows.appendChild(outSection);
+
+/* ---- Randomise strip ---- */
+const rndStrip = document.getElementById("rndStrip");
+const stripTitle = document.createElement("div"); stripTitle.className = "strip-title"; stripTitle.textContent = "Randomise";
+rndStrip.appendChild(stripTitle);
+const toggles = document.createElement("div"); toggles.className = "rnd-toggles";
+[
+  { key:"rnd_voice", cap:"Voice", def:true }, { key:"rnd_wavefolder", cap:"Fold", def:true },
+  { key:"rnd_filter", cap:"Filter", def:true }, { key:"rnd_tone", cap:"Tone", def:true },
+].forEach((it) => toggles.appendChild(makeToggle(it)));
+rndStrip.appendChild(toggles);
+const genBtn = document.createElement("button"); genBtn.className = "gen-btn"; genBtn.textContent = "Generate";
+genBtn.addEventListener("click", () => schwungRemote.setParam(P + "rnd_go", "go"));
+rndStrip.appendChild(genBtn);
+
+/* ---------------------------------------------------------------------
+ * Live sync
+ * ------------------------------------------------------------------- */
+function applyParams(params) {
+  let touched = false;
+  for (const fullKey in params) {
+    if (!Object.prototype.hasOwnProperty.call(params, fullKey)) continue;
+    const key = fullKey.indexOf(P) === 0 ? fullKey.slice(P.length) : fullKey;
+    if (registry[key]) { registry[key].set(params[fullKey]); touched = true; }
+  }
+  if (touched) setStatus(true);
+}
+
+function setStatus(live) {
+  const el = document.getElementById("status");
+  el.classList.toggle("live", live);
+  document.getElementById("statusText").textContent = live ? "Connected — live sync active" : "Connecting…";
+}
+
+function seed() {
+  Object.keys(registry).forEach((key) => {
+    schwungRemote.getParam(P + key).then((v) => { if (v !== undefined && v !== null && v !== "") registry[key].set(v); });
+  });
+}
+
+/* Re-fire the subscribe: the manager re-pushes the full current state on
+ * every subscribe, so this pulls every control back into sync if updates
+ * ever fall behind. */
+function forceSync() {
+  document.getElementById("statusText").textContent = "Re-syncing…";
+  try { window.parent.postMessage({ type: "subscribe" }, "*"); } catch (e) {}
+  setTimeout(seed, 250);
+}
+document.getElementById("sync").addEventListener("click", forceSync);
+
+schwungRemote.onParamChange(applyParams);
+setTimeout(seed, 200);
+</script>
+</body>
+</html>
