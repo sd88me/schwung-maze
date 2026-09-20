@@ -105,7 +105,9 @@
 #define BOSS_TONE_HZ    3800.0f    /* Boss passive tone stage corner */
 #define FILT_DRIVE_MAX  4.0f       /* extra small-signal gain at full Filt Drive */
 #define SVF_K_MAX       2.02f      /* damping at Resonance=0 (~Butterworth) */
-#define SVF_K_MIN       0.012f     /* damping at Resonance=100 (near self-osc) */
+#define SVF_RESO_NL     0.95f       /* 0..1 feedback saturation at max reso */
+#define RESO_BASS_COMP  0.7f       /* 1 = sqrt(Q) makeup (keeps some bass loss), 0 = full-Q */
+#define SVF_K_MIN       0.004f     /* damping at Resonance=100 (near self-osc) */
 
 /* v0.3.2 exponential control-curve endpoints */
 #define CUT_MIN_HZ      20.0f
@@ -227,10 +229,17 @@ static inline float svf_tick(svf_t* f, float x){
     float v3 = x - f->ic2;
     float v1 = a1 * f->ic1 + a2 * v3;
     float v2 = f->ic2 + a2 * f->ic1 + a3 * v3;
+    /* v1.4.0: nonlinear resonance. Saturate the band-pass term that carries
+     * the resonant feedback (more so as k falls), then rebuild v2 from it, so
+     * the peak blooms/squeals and self-oscillation limits into a driven sine
+     * instead of ringing linearly. Low resonance stays clean (nl -> 0). */
+    float nl = SVF_RESO_NL * (1.0f - clampf(f->k / SVF_K_MAX, 0.0f, 1.0f));
+    v1 += nl * (fast_tanh(v1) - v1);
+    v2 = f->ic2 + f->g * v1;
     f->ic1 = fast_tanh(2.0f * v1 - f->ic1);
     f->ic2 = fast_tanh(2.0f * v2 - f->ic2);
 
-    float peakQ  = 1.0f / f->k;
+    float peakQ  = sqrtf(1.0f / f->k) * RESO_BASS_COMP + (1.0f - RESO_BASS_COMP) / f->k;
     float lpComp = 1.0f / (1.0f + (peakQ - 1.0f) * f->morph);
     return (1.0f - f->morph) * v2 * lpComp + f->morph * v1;
 }
@@ -277,6 +286,7 @@ typedef struct {
     float  drift1, driftMod;
     float  note, vel;
     float  fsInternal;
+    int    outMode;   /* 0 internal voice, 1 external voice (post-fold VCO mix) */
 
     /* internal-domain params */
     float vcoTune;   /* semitones -24..24 */
@@ -527,6 +537,15 @@ static void set_param(void* instance, const char* key, const char* val){
         return;
     }
 
+    /* The Force shadow GUI (no int_values in its conf) sends an enum's option
+     * LABEL, not its index; accept both so those taps latch. */
+    if (!strcmp(key,"out_mode") && val[0]>='A'){
+        v->outMode = (val[0]=='E' || val[0]=='e'); return;
+    }
+    if (!strcmp(key,"route") && val[0]>='A'){
+        v->route = (!strncmp(val,"VCW",3)) ? 0 : (!strncmp(val,"VCF",3)) ? 2 : 1; return;
+    }
+
     float f = (float)atof(val);
     if      (!strcmp(key,"vco_tune"))   v->vcoTune  = f;
     else if (!strcmp(key,"mod_freq"))   v->modFreq  = f;
@@ -540,6 +559,7 @@ static void set_param(void* instance, const char* key, const char* val){
     else if (!strcmp(key,"fold_drive")) v->foldDrive= f/100.0f;
     else if (!strcmp(key,"fold_bias"))  v->foldBias = f/100.0f;
     else if (!strcmp(key,"route"))      v->route    = (int)clampf(f,0,2);
+    else if (!strcmp(key,"out_mode"))   v->outMode  = (int)clampf(f,0,1);
     else if (!strcmp(key,"fold_eg1"))   v->foldEg1  = f/100.0f;
     else if (!strcmp(key,"fold_key"))   v->foldKey  = f/100.0f;
     else if (!strcmp(key,"blend"))      v->blend    = f/100.0f;
@@ -566,13 +586,13 @@ static int build_state(maze_t* v, char* buf, int len){
       "fold_drive=%.4g,fold_bias=%.4g,route=%d,fold_eg1=%.4g,fold_key=%.4g,blend=%.4g,"
       "cutoff=%.4g,reso=%.4g,filter_mode=%.4g,env1_decay=%.4g,cutoff_eg1=%.4g,cutoff_key=%.4g,filt_drive=%.4g,"
       "vco_lvl=%.4g,mod_lvl=%.4g,noise_lvl=%.4g,noise_tone=%.4g,ring_lvl=%.4g,sat=%.4g,level=%.4g,"
-      "vco_key=%.4g,mod_key=%.4g,"
+      "vco_key=%.4g,mod_key=%.4g,out_mode=%d,"
       "rnd_voice=%d,rnd_wavefolder=%d,rnd_filter=%d,rnd_tone=%d",
       v->vcoTune, v->modFreq, v->fmDepth*100, v->fmEg1*100, v->vcoEg1*100, v->modEg1*100, v->env2Decay*100,
       v->foldDrive*100, v->foldBias*100, v->route, v->foldEg1*100, v->foldKey*100, v->blend*100,
       v->cutoff*100, v->reso*100, v->filterMode*100, v->env1Decay*100, v->cutoffEg1*100, v->cutoffKey*100, v->filtDrive*100,
       v->vcoLvl*100, v->modLvl*100, v->noiseLvl*100, v->noiseTone*100, v->ringLvl*100, v->sat*100, v->level*100,
-      v->vcoKey*100, v->modKey*100,
+      v->vcoKey*100, v->modKey*100, v->outMode,
       v->rndVoice, v->rndWavefolder, v->rndFilter, v->rndTone);
 }
 
@@ -612,6 +632,7 @@ static int get_param(void* instance, const char* key, char* buf, int buf_len){
     else if (!strcmp(key,"fold_drive")) f = v->foldDrive*100.0f;
     else if (!strcmp(key,"fold_bias"))  f = v->foldBias*100.0f;
     else if (!strcmp(key,"route"))      f = (float)v->route;
+    else if (!strcmp(key,"out_mode"))   f = (float)v->outMode;
     else if (!strcmp(key,"fold_eg1"))   f = v->foldEg1*100.0f;
     else if (!strcmp(key,"fold_key"))   f = v->foldKey*100.0f;
     else if (!strcmp(key,"blend"))      f = v->blend*100.0f;
@@ -651,6 +672,7 @@ typedef struct {
     float foldBias, blend, amp, level;
     float filtDrive;
     int   route;
+    int   ext;
 } ctrl_t;
 
 static inline float voice_tick(maze_t* v, const ctrl_t* c, float foldGain){
@@ -685,7 +707,10 @@ static inline float voice_tick(maze_t* v, const ctrl_t* c, float foldGain){
     float core = premix + ring * c->gRing;
 
     float folded, filtered;
-    if (c->route == 1){
+    if (c->ext){
+        folded   = wavefold(foldGain * core + c->foldBias);
+        filtered = 0.0f;   /* filter bypassed: raw VCO mix -> folder only */
+    } else if (c->route == 1){
         folded   = wavefold(foldGain * core + c->foldBias);
         filtered = svf_tick(&v->svf, filt_drive_shape(core, c->filtDrive));
     } else if (c->route == 0){
@@ -699,6 +724,8 @@ static inline float voice_tick(maze_t* v, const ctrl_t* c, float foldGain){
 
     float blendPos = 0.5f + 0.5f * c->blend;
     float mix = (1.0f - blendPos) * folded + blendPos * filtered;
+
+    if (c->ext) return folded * c->level;   /* EXTERNAL VOICE: raw post-fold VCO mix, ungated */
 
     float outp = sat_process(&v->satOut, 1.1f * mix);
     outp = dcblock(&v->dcOut, outp);
@@ -781,6 +808,7 @@ static void render_block(void* instance, int16_t* out_lr, int frames){
     c.level = v->sLevel;
     c.filtDrive = v->sFiltDrive;
     c.route = v->route;
+    c.ext = v->outMode;
 
     float foldKeyTerm = v->foldKey * ((v->note - 60.0f) / 24.0f);
 

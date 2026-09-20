@@ -2,7 +2,7 @@
   "id": "maze-voice",
   "name": "Maze Voice",
   "abbrev": "MAZE",
-  "version": "1.3.4",
+  "version": "1.4.0",
   "description": "Monophonic Moog Labyrinth-style thru-zero oscillator / wavefolder / state-variable filter voice.",
   "author": "sd88me",
   "dsp": "dsp.so",
@@ -28,6 +28,7 @@
 
       { "key": "fold_drive", "name": "Fold Drive","type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
       { "key": "fold_bias",  "name": "Fold Bias", "type": "float", "min": -100, "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
+      { "key": "out_mode",   "name": "Output Mode","type": "enum", "options": ["Internal Voice", "External Voice"], "default": 0 },
       { "key": "route",      "name": "Route",     "type": "enum",  "options": ["VCW>VCF", "Parallel", "VCF>VCW"], "default": 1 },
       { "key": "fold_eg1",   "name": "Fold EG1",  "type": "float", "min": -100, "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
       { "key": "fold_key",   "name": "Fold Key",  "type": "float", "min": 0,    "max": 100,  "default": 0,   "step": 1,    "display_format": "%.0f" },
@@ -86,7 +87,7 @@
         "tone": {
           "label": "Tone",
           "knobs": ["vco_lvl", "mod_lvl", "noise_lvl", "noise_tone", "ring_lvl", "sat", "level"],
-          "params": ["vco_lvl", "mod_lvl", "noise_lvl", "noise_tone", "ring_lvl", "sat", "level"]
+          "params": ["vco_lvl", "mod_lvl", "noise_lvl", "noise_tone", "ring_lvl", "sat", "level", "out_mode"]
         },
         "modrouting": {
           "label": "Mod Routing",

@@ -425,6 +425,7 @@ const outTitle = document.createElement("div"); outTitle.className = "half-title
 const outRow = document.createElement("div"); outRow.className = "half-row";
 outRow.appendChild(col([ makeKnob({ size:"small", extra:true, key:"sat", cap:"Tone/Sat", min:0, max:100, def:0 }) ]));
 outRow.appendChild(col([ makeKnob({ size:"big", key:"level", cap:"Volume", min:0, max:100, def:80 }) ]));
+outRow.appendChild(col([ makeToggle({ key:"out_mode", cap:"External Voice", def:false }) ])); /* raw post-fold VCO mix, ungated */
 outHalf.appendChild(outTitle); outHalf.appendChild(outRow);
 
 outSection.appendChild(envHalf);

@@ -9,8 +9,8 @@
       "download_url": "https://github.com/sd88me/schwung-maze/releases/download/v1.3.4/maze_seq_lite-module.tar.gz"
     },
     "maze-voice": {
-      "version": "1.3.4",
-      "download_url": "https://github.com/sd88me/schwung-maze/releases/download/v1.3.4/maze-voice-module.tar.gz"
+      "version": "1.4.0",
+      "download_url": "https://github.com/sd88me/schwung-maze/releases/download/v1.4.0/maze-voice-module.tar.gz"
     }
   }
 }
